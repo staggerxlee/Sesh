@@ -1,0 +1,1 @@
+Sesh Listening Room original audio. The piano étude, rain, nature and lo-fi loops were generated exclusively from frontend/art/build-sound.py. No third-party recordings or samples are used. These four audio files are released under CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
