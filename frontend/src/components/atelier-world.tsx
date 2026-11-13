@@ -3,10 +3,11 @@ import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 import * as T from "three";
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, type RefObject } from "react";
 import gsap from "gsap";
 import { BookBindings } from "./book-bindings";
 import { SalonSky, Sunbeams } from "./salon-light";
+import { SalonDetails } from "./salon-details";
 import { CoffeeSteam } from "./coffee-steam";
 import { finishWood, WindowLight } from "./room-materials";
 import { pianistState, type PianistState } from "@/lib/pianist";
@@ -95,9 +96,19 @@ function Rain({ on, moving }: { on: boolean; moving: boolean }) {
     </lineSegments>
   );
 }
-function Model({ p }: { p: WorldProps }) {
-  const room = useLoader(GLTFLoader, "/atelier/room.glb"),
-    actor = useLoader(GLTFLoader, "/atelier/pianist.glb");
+function Model({
+  p,
+  leoTarget,
+}: {
+  p: WorldProps;
+  leoTarget: RefObject<HTMLButtonElement | null>;
+}) {
+  const [room, actor, dog, bouquet] = useLoader(GLTFLoader, [
+    "/atelier/room.glb",
+    "/atelier/pianist.glb",
+    "/atelier/leo.glb",
+    "/atelier/pink-lilies.glb",
+  ]);
   const scene = useMemo(() => clone(actor.scene), [actor]),
     mixer = useMemo(() => new T.AnimationMixer(scene), [scene]);
   const progress = useRef(0),
@@ -340,7 +351,7 @@ function Model({ p }: { p: WorldProps }) {
     )
       frame.current = setTimeout(
         invalidate,
-        v !== dest || s === "Playing" ? 24 : 115,
+        v !== dest || s === "Playing" ? 24 : p.moving && p.effects ? 50 : 115,
       );
   });
   return (
@@ -379,6 +390,13 @@ function Model({ p }: { p: WorldProps }) {
       />
       <primitive object={room.scene} />
       <BookBindings />
+      <SalonDetails
+        dogScene={dog.scene}
+        flowerScene={bouquet.scene}
+        animate={p.effects && p.moving && !p.parked}
+        interactive={interior && !p.parked}
+        target={leoTarget}
+      />
       <WindowLight
         warm={!interior || (p.sound !== "rain" && p.sound !== "lofi")}
       />
@@ -399,17 +417,29 @@ function Model({ p }: { p: WorldProps }) {
   );
 }
 export default function AtelierWorld(p: WorldProps) {
+  const leoTarget = useRef<HTMLButtonElement>(null);
   return (
-    <Canvas
-      camera={{ position: [6.2, 5.2, 7.9], near: 0.035, far: 50, fov: 45 }}
-      dpr={[1, 1.5]}
-      frameloop="demand"
-      shadows={{ type: T.PCFShadowMap }}
-      gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}
-    >
-      <Suspense fallback={null}>
-        <Model p={p} />
-      </Suspense>
-    </Canvas>
+    <>
+      <Canvas
+        camera={{ position: [6.2, 5.2, 7.9], near: 0.035, far: 50, fov: 45 }}
+        dpr={[1, 1.5]}
+        frameloop="demand"
+        shadows={{ type: T.PCFShadowMap }}
+        gl={{ antialias: true, alpha: false, powerPreference: "low-power" }}
+      >
+        <Suspense fallback={null}>
+          <Model p={p} leoTarget={leoTarget} />
+        </Suspense>
+      </Canvas>
+      <button
+        className="leo-greeting"
+        ref={leoTarget}
+        hidden
+        aria-label="Greet Leo, the sleeping Japanese Spitz"
+        type="button"
+      >
+        <span>Leo</span>
+      </button>
+    </>
   );
 }

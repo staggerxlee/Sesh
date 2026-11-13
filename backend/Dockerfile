@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir -r requirements.lock.txt && useradd --create-home
 COPY . .
 USER sesh
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]
+CMD ["sh", "start.sh"]

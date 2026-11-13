@@ -389,26 +389,7 @@ for (let j = 0; j < 28; j++) {
 box(2.58, 0.56, -2.08, 0.6, 1.12, 0.52, wood);
 box(2.58, 1.13, -2.08, 0.66, 0.06, 0.58, oak);
 cyl(2.6, 1.32, -1.96, 0.09, 0.15, 0.32, "#ede4c9");
-for (let k = 0; k < 3; k++) {
-  let x = 2.54 + k * 0.082,
-    y = 1.65 + (k % 2) * 0.16;
-  box(x, y - 0.11, -1.94, 0.014, 0.33, 0.014, "#74855f");
-  for (let j = 0; j < 6; j++) {
-    let a = j * 1.047;
-    const petal = ball(
-      x + Math.cos(a) * 0.054,
-      y + 0.035,
-      -1.94 + Math.sin(a) * 0.054,
-      0.031,
-      0.088,
-      0.041,
-      ["#e6aaa9", "#ecc2b9"][j % 2],
-    );
-    petal.rotation.z = -Math.cos(a) * 0.77;
-    petal.rotation.x = Math.sin(a) * 0.77;
-  }
-  ball(x, y + 0.035, -1.94, 0.019, 0.035, 0.018, brass);
-}
+// The articulated bouquet is exported separately by build-salon-details.mjs.
 for (let j = 0; j < 14; j++) {
   let z = -2.1 + j * 0.32;
   box(-2.78, 0.29, z, 0.04, 0.27, 0.025, oak);

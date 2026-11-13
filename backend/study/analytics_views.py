@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .analytics import AnalyticsService
+from .calendar_report import chapter, archive_details
 from .serializers import StudySessionSerializer
 
 
@@ -57,9 +58,14 @@ class CalendarView(APIView):
     def get(self, request):
         service = AnalyticsService(request.user)
         start, end = parse_range(request, service.today)
+        selected_month = parse_date(request.query_params.get('month', start.isoformat()), 'month')
+        if not 1900 <= selected_month.year <= 2100:
+            raise ValidationError({'month': 'Choose a month between 1900 and 2100.'})
         return Response({
             'from': start.isoformat(), 'to': end.isoformat(), 'timezone': str(service.tz),
             'days': service.daily(start, end),
+            'chapter': chapter(service, selected_month),
+            **archive_details(service, start, end),
             'sessions': StudySessionSerializer(
                 service.sessions_between(start, end), many=True, context={'request': request},
             ).data,

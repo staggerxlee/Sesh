@@ -1,17 +1,133 @@
-# Deploying Sesh
+# Deploy Sesh for free
 
-Deploy the frontend and backend separately. Sesh has not been deployed by this build.
+Use **Vercel Hobby** (website), **Render Free** (Django), **Neon Free** (PostgreSQL), and **Brevo Free** (account emails). No custom domain is required. Choose Free/Hobby when creating each service; plans and quotas can change.
 
-1. Provision a managed PostgreSQL database and set the backend `DATABASE_URL` using the provider's TLS configuration. Do not use the development trust database or local example password in production.
-2. Deploy `backend/` with its Dockerfile or Python hosting. Install `requirements.lock.txt`, run `python manage.py migrate --noinput` as a release step, and run Gunicorn. Configure a random `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, exact `DJANGO_ALLOWED_HOSTS`, and the public `FRONTEND_URL`.
-3. Set `CSRF_TRUSTED_ORIGINS` to the HTTPS frontend origin. For the included same-origin proxy, the browser sends cookies only to the frontend; do not set a backend-only cookie domain. Set CORS origins explicitly if direct browser-to-API access is introduced. Avoid cross-site cookies when the same-origin proxy suffices.
-4. Configure SMTP `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, credentials, TLS and a verified `DEFAULT_FROM_EMAIL`. Test real verification and password-reset delivery before launch. Development console mail is not real delivery.
-5. Deploy `frontend/` as the Vercel project root, build with `npm run build`, and configure server-only `DJANGO_API_URL` to the backend HTTPS origin. The included `/api/:path*` rewrite forwards cookies and CSRF headers and preserves Django's required trailing slash.
-6. Terminate HTTPS at a trusted reverse proxy that overwrites `X-Forwarded-Proto`. Django uses this header for secure request detection. Do not expose a backend that trusts arbitrary client-supplied forwarding headers.
-7. Run `python manage.py check --deploy` in the actual production configuration. Configure database backups, health checks, error monitoring and real load tests. Verify cookie flags, verification/reset links, cross-origin behavior, and account isolation at the deployed origins.
+Repository: https://github.com/staggerxlee/Sesh — branch `main`.
 
-Session/authentication rate limits currently use Django's local-memory cache. Before using multiple web workers or multiple replicas in production, configure a shared cache for consistent rate limiting (for example Django RedisCache with Redis) and edge-level request limits. On-demand reports require no Celery worker. Redis here would serve shared throttling, not scheduled report generation.
+## 1. Neon — saved accounts and study data
 
-The frontend has no embedded secrets or browser-stored authentication tokens. Local storage holds only last-used timer settings and unsynced timer intent. Session history and calculations are authoritative in Django/PostgreSQL.
+1. Sign in at [Neon](https://console.neon.tech/) and create a **Free** project called `sesh`.
+2. Choose Singapore or the closest available region to Render Singapore. Keep the default database and role.
+3. Click **Connect**, turn **connection pooling off**, and copy the full direct PostgreSQL connection string. Retain its TLS options, including `sslmode=require` and any `channel_binding` option.
+4. Save it privately for Render's `DATABASE_URL`. It does not belong in GitHub or Vercel.
 
-Reference documentation used for integration: [Next.js rewrites](https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites), [Django CSRF](https://docs.djangoproject.com/en/5.2/howto/csrf/), [DRF session authentication](https://www.django-rest-framework.org/api-guide/authentication/#sessionauthentication).
+This small deployment uses one worker with four threads and a direct connection, including for migrations. Do not use the local development database URL. The new online database starts empty: your local accounts and history are not automatically uploaded.
+
+## 2. Brevo — verification and password resets
+
+Render Free blocks standard SMTP ports. The included HTTPS email adapter avoids that restriction.
+
+1. Create a [Brevo Free account](https://www.brevo.com/) and complete any required transactional-email activation.
+2. Under **Settings → Senders, Domains & Dedicated IPs → Senders**, add **Sesh** with an email address you own. Complete sender verification.
+3. Under **SMTP & API → API Keys**, create an **API key**, not an SMTP key.
+4. Keep the key privately for Render. Your sender setting is `Sesh <your-verified-email-address>`.
+
+Brevo Free currently includes 300 emails/day. For free email addresses or unauthenticated domains, Brevo may rewrite the sender to a compliant domain. An authenticated domain is preferable if you have one. Test actual delivery after deployment and check spam folders. Do not use Django's console mail backend publicly: it logs private reset links instead of delivering them.
+
+## 3. Vercel — create the website
+
+At [Vercel New Project](https://vercel.com/new), import `staggerxlee/Sesh`:
+
+| Setting | Value |
+| --- | --- |
+| Plan | Hobby |
+| Project name | `sesh` or an available name |
+| Production branch | `main` |
+| Framework | Next.js |
+| Root Directory | `frontend` |
+| Node.js | `22.x` |
+| Install command | `npm ci` |
+| Build command | `npm run build` |
+| Output Directory | Leave the Next.js default |
+
+Deploy once to obtain your stable **production domain**, such as `https://sesh-yourname.vercel.app`. Find it under **Settings → Domains**; do not use a commit-specific preview URL. The interface may load now, but accounts will not work until steps 4–5.
+
+## 4. Render — create the backend
+
+At [Render](https://dashboard.render.com/), choose **New → Blueprint**, connect `staggerxlee/Sesh`, and select `main`. Render reads the included `render.yaml`. It creates **one Free Docker web service** called `sesh-api` in Singapore, with no Render database. Confirm the selected plan stays Free.
+
+Fill in the four prompted values:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Full direct Neon connection string from step 1 |
+| `FRONTEND_URL` | Exact Vercel production URL, including `https://`, without a trailing slash |
+| `BREVO_API_KEY` | Your Brevo API key |
+| `DEFAULT_FROM_EMAIL` | `Sesh <your-verified-sender-address>` |
+
+The Blueprint supplies these automatically:
+
+| Variable / setting | Value |
+| --- | --- |
+| `DJANGO_DEBUG` | `0` |
+| `DJANGO_SECRET_KEY` | Generated securely by Render; keep stable across updates |
+| `EMAIL_BACKEND` | `study.email_backend.BrevoEmailBackend` |
+| Dockerfile | `./backend/Dockerfile` |
+| Docker build context | `./backend` |
+| Health Check Path | `/health/` |
+| Docker Command | Leave empty; use the Dockerfile default |
+
+Django automatically allows Render's assigned hostname through `RENDER_EXTERNAL_HOSTNAME`. CSRF and CORS origins default to `FRONTEND_URL`; no wildcard or separate variables are needed. If you already set `CSRF_TRUSTED_ORIGINS` or `CORS_ALLOWED_ORIGINS`, update them to the same exact HTTPS frontend origin.
+
+Startup checks the application, applies all database migrations (including calendar notes), and runs Gunicorn on Render's assigned port. One process with four threads keeps the in-memory throttles in one process. Configure a shared cache before increasing processes/instances.
+
+When the service shows **Live**, copy the backend URL, e.g. `https://sesh-api-abcd.onrender.com`. Visit its `/health/` path and expect `{"status":"ok","service":"sesh"}`. The first request after idle can take about a minute.
+
+## 5. Connect Vercel to Render
+
+In **Vercel → project → Settings → Environment Variables**, add:
+
+| Variable | Value | Environment |
+| --- | --- | --- |
+| `DJANGO_API_URL` | Your Render origin, e.g. `https://sesh-api-abcd.onrender.com` | Production |
+
+Use **no trailing slash** and **no `/api` suffix**. Do not prefix the variable with `NEXT_PUBLIC_`.
+
+Then **Deployments → latest production deployment → Redeploy**. The API rewrite is configured at build time, so redeployment is required after changing this value.
+
+Browser API requests go through the Vercel origin to Django. Leave cookie domains unset; secure cookies and `SameSite=Lax` are already configured. Do not switch to cross-site cookies. If the Vercel production domain changes, update Render's `FRONTEND_URL`. A custom backend domain also requires `DJANGO_ALLOWED_HOSTS`. Preview deployments are not automatically authorized to use the production account backend.
+
+## 6. Verify and share
+
+Use your Vercel production URL:
+
+1. Create an account and receive/open the verification email.
+2. Add a subject, finish a short real study session, and confirm History and Calendar update.
+3. Sign into the same account on a second device: records and notes should appear there.
+4. Have your friend create a **separate account**. They should see their own history, not yours.
+5. Test sign-out/sign-in and a real password-reset email.
+6. Save a daily/monthly note, reload, and confirm it remains saved.
+
+Share the **Vercel production URL**, not Render or `localhost:3000`. Your laptop does not need to stay on. Local accounts/history remain separate; request a deliberate migration if you want them transferred.
+
+## Updates and free-plan limits
+
+Keep Git integration and auto-deploy enabled for `main` on both hosts. Push tested updates to GitHub; both services rebuild, and Render applies migrations before starting. Neon retains online records across redeploys. Keep the same database and secret key instead of recreating them.
+
+Render Free sleeps after 15 idle minutes and can take about a minute to wake. If the app initially reports a connection error, open the backend `/health/` URL, wait for it to respond, then reload Sesh. Active study heartbeats normally keep the backend busy, but outages can still trigger Sesh's conservative recovery flow. Free hosting is not an uptime guarantee.
+
+Neon is used because Render's free PostgreSQL expires after 30 days. Sesh stores personal cover images in PostgreSQL, so they survive Render's temporary filesystem but count against database storage. Monitor free-plan quotas and keep exports/backups.
+
+## Troubleshooting
+
+| Problem | Check |
+| --- | --- |
+| Site loads but login fails | Render is Live; Vercel has `DJANGO_API_URL`; redeploy Vercel after changing it |
+| First request times out | Wake Render through `/health/`, then reload the site |
+| 403 CSRF | Render `FRONTEND_URL` exactly matches the Vercel production origin, including HTTPS |
+| DisallowedHost | Automatic Render hostname should work; add custom backend domains to `DJANGO_ALLOWED_HOSTS` |
+| Database startup failure | Complete direct Neon URL with TLS, not localhost or a pooled connection |
+| Emails missing | Brevo transactional activation, verified sender, API key, delivery logs and spam folders |
+| Old interface after push | Check both hosts deployed the latest `main` commit and inspect build logs |
+
+Preparing this repository does not provision hosting. Live HTTPS, real email delivery and account isolation must be verified on the deployed URLs. The email adapter is tested using mocked HTTPS responses; no external test emails are sent.
+
+## Official references
+
+- [Render free limits](https://render.com/docs/free)
+- [Render Blueprint settings](https://render.com/docs/blueprint-spec)
+- [Neon Free plan](https://neon.com/pricing)
+- [Vercel external rewrites](https://vercel.com/docs/routing/rewrites)
+- [Brevo Free plan](https://help.brevo.com/hc/en-us/articles/208580669-FAQs-What-are-the-limits-of-the-Free-plan)
+- [Brevo email API](https://developers.brevo.com/reference/send-transac-email)
+- [Brevo sender-domain handling](https://help.brevo.com/hc/en-us/articles/14925263522578-Comply-with-Gmail-Yahoo-and-Microsoft-s-requirements-for-email-senders)

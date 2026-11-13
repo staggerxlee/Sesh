@@ -24,6 +24,12 @@ export function MenuTimeline({
         defaults: { ease: "power2.out" },
         onReverseComplete: onExit,
       });
+      tl.fromTo(
+        document.documentElement,
+        { "--navigation-blur": "0px" },
+        { "--navigation-blur": "8px", duration: 0.3 },
+        0,
+      );
       tl.fromTo(".nav-scrim", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0)
         .fromTo(
           ".nav-primary a",

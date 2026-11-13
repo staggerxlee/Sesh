@@ -88,8 +88,7 @@ body:has(.cinema-host) .immersive-top {
     rgba(14, 13, 12, 0.4) 66%,
     rgba(10, 9, 8, 0.59) 100%
   );
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* Background layers are filtered directly for Chromium/WebGL consistency. */
 }
 .nav-scrim[data-home="true"] {
   background: linear-gradient(
@@ -422,4 +421,12 @@ main#main.route-stage,
   transition-duration: 0s !important;
   animation-duration: 1ms !important;
   animation-delay: 0s !important;
+}
+
+:root {
+  --navigation-blur: 0px;
+}
+body:has(.menu-motion)
+  :is(.app-shell, .home-world-host, .cinema-host, .sesh-masthead) {
+  filter: blur(var(--navigation-blur));
 }

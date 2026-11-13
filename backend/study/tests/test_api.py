@@ -78,6 +78,21 @@ class DataAPITests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
+    def test_subject_color_persists_across_clients(self):
+        created = self.client.post('/api/v1/subjects/', {'name': 'Color study', 'color': '#AAA5C4'}, format='json')
+        self.assertEqual(created.status_code, 201)
+        subject_id = created.data['id']
+        changed = self.client.patch(f'/api/v1/subjects/{subject_id}/', {'color': '#456789'}, format='json')
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(Subject.objects.get(pk=subject_id).color, '#456789')
+        second_device = APIClient()
+        second_device.force_authenticate(self.user)
+        fetched = second_device.get('/api/v1/subjects/')
+        self.assertEqual(fetched.status_code, 200)
+        self.assertEqual(next(subject['color'] for subject in fetched.data if subject['id'] == subject_id), '#456789')
+        self.subject.refresh_from_db()
+        self.assertEqual(self.subject.color, '#7B8C72')
+
     def manual(self):
         return self.client.post('/api/v1/sessions/', {'subject': self.subject.pk, 'topic': self.topic.pk,
             'started_at': (timezone.now() - timedelta(hours=2)).isoformat(), 'duration_seconds': 1800, 'note': 'Practice'}, format='json')

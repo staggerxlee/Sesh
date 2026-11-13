@@ -8,11 +8,11 @@ import { usePathname } from "next/navigation";
 import { MotionConfig } from "motion/react";
 import { SeshProvider, useSesh } from "@/lib/store";
 import { AuthDialog } from "./auth";
+import { CalendarPage } from "./study-calendar";
 import { Home } from "./home";
 import { ActiveFocus } from "./focus";
 import {
   AnalyticsPage,
-  CalendarPage,
   HistoryPage,
   ReviewsPage,
   SettingsPage,

@@ -4,7 +4,7 @@ A beautiful place to focus. A complete local Next.js + Django + PostgreSQL appli
 
 ## Start locally
 
-Requirements: Node.js 20.9+ (22+ recommended), Python 3.12+, and PostgreSQL 16+. The launcher uses locally installed PostgreSQL when `DATABASE_URL` is unset.
+Requirements: Node.js 22.x, Python 3.12+, and PostgreSQL 16+. The launcher uses locally installed PostgreSQL when `DATABASE_URL` is unset.
 
 ```sh
 ./scripts/dev.sh
@@ -20,7 +20,11 @@ cp backend/.env.example backend/.env
 ./scripts/dev.sh
 ```
 
-Development verification and password-reset links are printed in the Django terminal. **No emails are delivered until SMTP is configured.** No production account or hosting has been provisioned.
+Development verification and password-reset links are printed in the Django terminal. **No emails are delivered until an email provider is configured.** No production account or hosting has been provisioned.
+
+## Put Sesh online
+
+Follow [the free deployment guide](docs/DEPLOYMENT.md) for Vercel + Render + Neon, including every environment variable and account-email setup. The repository includes a free Render Blueprint and automatic database migrations. Your friend creates a separate Sesh account; each account's study data stays private. GitHub pushes can automatically update both services.
 
 ## What is implemented
 

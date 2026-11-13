@@ -47,6 +47,14 @@ import {
 import { useSesh } from "@/lib/store";
 import { useSystemStill } from "@/lib/navigation-motion";
 import { api, signOut as endLogin } from "@/lib/api";
+import {
+  dayAdd,
+  weekday,
+  weekStart,
+  monthStart,
+  monthEnd,
+  monthAdd,
+} from "@/lib/calendar-dates";
 import { dateKey, dayLabel, duration } from "@/lib/utils";
 import type {
   Analytics,
@@ -60,18 +68,22 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import "./reflection.css";
-import { motion } from "motion/react";
+import { SubjectCover, SubjectExplorer } from "./subject-explorer";
+import { motion, AnimatePresence } from "motion/react";
 
-const COLORS = [
-  "#748367",
-  "#af9478",
-  "#8b9da8",
-  "#b18d98",
-  "#aea56f",
-  "#8b86a1",
-  "#b78870",
-  "#697f7c",
+const SUBJECT_COLORS = [
+  ["Dusty Rose", "#C8A7B0"],
+  ["Lavender Mist", "#AAA5C4"],
+  ["Sage", "#9CAF91"],
+  ["Powder Blue", "#A5BBD0"],
+  ["Warm Sand", "#D7BB9E"],
+  ["Muted Terracotta", "#C58D7D"],
+  ["Soft Butter", "#DCCB96"],
+  ["Misty Teal", "#91B8AF"],
+  ["Mauve", "#B39AB9"],
+  ["Slate", "#909DAA"],
 ];
+const COLORS = SUBJECT_COLORS.map(([, hex]) => hex);
 const WEEKDAYS = [
   "Monday",
   "Tuesday",
@@ -223,36 +235,6 @@ function Loading() {
     </div>
   );
 }
-function dayAdd(key: string, days: number) {
-  const date = new Date(key + "T12:00:00Z");
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-function weekday(key: string) {
-  return (new Date(key + "T12:00:00Z").getUTCDay() + 6) % 7;
-}
-function weekStart(key: string, start: number) {
-  return dayAdd(key, -((weekday(key) - start + 7) % 7));
-}
-function monthStart(key: string) {
-  return key.slice(0, 7) + "-01";
-}
-function monthEnd(key: string) {
-  const date = new Date(key + "T12:00:00Z");
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 12),
-  )
-    .toISOString()
-    .slice(0, 10);
-}
-function monthAdd(key: string, n: number) {
-  const date = new Date(key + "T12:00:00Z");
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + n, 1, 12),
-  )
-    .toISOString()
-    .slice(0, 10);
-}
 function inputDateTime(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone,
@@ -294,8 +276,16 @@ function SubjectDot({ color }: { color: string }) {
 }
 
 export function SubjectsPage() {
-  const { user, subjects, topics, stats, refresh, notify, openAuth } =
-    useSesh();
+  const {
+    user,
+    subjects,
+    topics,
+    stats,
+    refresh,
+    notify,
+    openAuth,
+    preferences,
+  } = useSesh();
   const [archived, setArchived] = useState(false),
     [editing, setEditing] = useState<Subject | "new" | null>(null),
     [name, setName] = useState(""),
@@ -310,6 +300,9 @@ export function SubjectsPage() {
     [topicEdit, setTopicEdit] = useState<Topic | null>(null),
     [topicName, setTopicName] = useState(""),
     [topicDelete, setTopicDelete] = useState<Topic | null>(null);
+  const systemStill = useSystemStill();
+  const still = systemStill || preferences.reduced_motion;
+  const subjectOrigin = useRef<HTMLElement | null>(null);
   const visible = subjects.filter((s) => s.archived === archived);
   function edit(subject: Subject | "new") {
     if (!user) {
@@ -437,136 +430,105 @@ export function SubjectsPage() {
     }
   }
   return (
-    <div className="reflection">
+    <div className="reflection subjects-page">
       <Header
-        eyebrow="A little structure"
-        title="Room for every curiosity."
-        description="Give your focus a home. Keep it as simple as you like."
-        action={
-          <Button onClick={() => edit("new")}>
-            <Plus size={16} /> New subject
-          </Button>
-        }
+        eyebrow=""
+        title="Your Subjects"
+        description="Your subjects, topics, and time spent learning."
       />
       <div className="r-toolbar">
         <div className="r-segmented" aria-label="Subject status">
           <button aria-pressed={!archived} onClick={() => setArchived(false)}>
-            Your subjects{" "}
+            Your Subjects{" "}
             <span>{subjects.filter((s) => !s.archived).length}</span>
           </button>
           <button aria-pressed={archived} onClick={() => setArchived(true)}>
             Archived <span>{subjects.filter((s) => s.archived).length}</span>
           </button>
         </div>
-        <span className="r-meta">A subject is all you need to begin.</span>
       </div>
-      {!visible.length ? (
-        <Empty
-          title={
-            archived ? "A place for past chapters." : "What are you learning?"
-          }
-        >
-          {archived
-            ? "Archived subjects will stay here, with all your history intact."
-            : "Add your first subject, then settle into a session. You can add topics whenever you need them."}
-          {!archived && (
-            <Button onClick={() => edit("new")}>
-              <Plus size={15} /> Add your first subject
-            </Button>
-          )}
+      <div className="subject-gallery">
+        {!archived && (
+          <button className="subject-add" onClick={() => edit("new")}>
+            <strong>Add New</strong>
+            <span>Give a subject its own space.</span>
+            <i>
+              <Plus size={30} />
+            </i>
+          </button>
+        )}
+        <AnimatePresence initial={true} mode="popLayout">
+          {visible.map((subject, position) => (
+            <motion.article
+              layout={!still}
+              initial={{ opacity: 0, y: still ? 0 : 10 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: still ? 1 : 0.97 }}
+              transition={{
+                duration: still ? 0 : 0.32,
+                delay: Math.min(position * 0.025, 0.12),
+                layout: { type: "spring", stiffness: 180, damping: 30 },
+              }}
+              className="subject-tile"
+              key={subject.id}
+              data-expanded={topicSubject?.id === subject.id || undefined}
+            >
+              <button
+                className="subject-open"
+                aria-label={`Open ${subject.name}`}
+                onClick={(event) => {
+                  subjectOrigin.current = event.currentTarget;
+                  setTopicSubject(subject);
+                  setTopicName("");
+                  setTopicEdit(null);
+                  setTopicDelete(null);
+                  setError("");
+                }}
+              >
+                <SubjectCover
+                  interactive
+                  subject={subject}
+                  count={topics.filter((t) => t.subject === subject.id).length}
+                  totals={stats?.subjects.find((s) => s.id === subject.id)}
+                />
+              </button>
+              <div className="subject-actions">
+                <button
+                  aria-label={`Edit ${subject.name}`}
+                  onClick={() => edit(subject)}
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
+                  disabled={saving}
+                  aria-label={`${subject.archived ? "Restore" : "Archive"} ${subject.name}`}
+                  onClick={() => archive(subject)}
+                >
+                  {subject.archived ? (
+                    <RotateCcw size={16} />
+                  ) : (
+                    <Archive size={16} />
+                  )}
+                </button>
+                <button
+                  aria-label={`Delete ${subject.name}`}
+                  onClick={() => {
+                    setDeleting(subject);
+                    setConfirmation("");
+                    setError("");
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </motion.article>
+          ))}
+        </AnimatePresence>
+      </div>
+      {archived && !visible.length && (
+        <Empty title="No archived subjects">
+          Subjects you archive will appear here with their study history.
         </Empty>
-      ) : (
-        <div className="r-subject-grid">
-          {visible.map((subject) => {
-            const totals = stats?.subjects.find((s) => s.id === subject.id);
-            const progress = subject.weekly_goal_minutes
-              ? ((totals?.weekly_seconds || 0) /
-                  (subject.weekly_goal_minutes * 60)) *
-                100
-              : 0;
-            return (
-              <article className="r-subject-card" key={subject.id}>
-                <div className="r-subject-card-top">
-                  <span
-                    className="r-book-icon"
-                    style={{
-                      background: subject.color + "16",
-                      color: subject.color,
-                    }}
-                  >
-                    <BookOpen size={23} strokeWidth={1.4} />
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`Edit ${subject.name}`}
-                    onClick={() => edit(subject)}
-                  >
-                    <MoreHorizontal size={19} />
-                  </Button>
-                </div>
-                <h2>{subject.name}</h2>
-                <p className="r-meta">
-                  {topics.filter((t) => t.subject === subject.id).length} topics
-                  · {duration(totals?.seconds || 0)} in selected period
-                </p>
-                <div className="r-subject-week">
-                  <span>This week</span>
-                  <strong>{duration(totals?.weekly_seconds || 0)}</strong>
-                </div>
-                {subject.weekly_goal_minutes > 0 ? (
-                  <>
-                    <Meter
-                      value={progress}
-                      label={`${subject.name} weekly goal`}
-                    />
-                    <p className="r-meta r-goal-caption">
-                      of {duration(subject.weekly_goal_minutes * 60)} weekly
-                      goal
-                    </p>
-                  </>
-                ) : (
-                  <p className="r-meta r-no-goal">
-                    No weekly target. Your pace, your choice.
-                  </p>
-                )}
-                <div className="r-card-actions">
-                  <button
-                    onClick={() => {
-                      setTopicSubject(subject);
-                      setTopicName("");
-                      setTopicEdit(null);
-                      setError("");
-                    }}
-                  >
-                    Manage topics <ArrowUpRight size={14} />
-                  </button>
-                  <button
-                    disabled={saving}
-                    onClick={() => archive(subject)}
-                    aria-label={`${subject.archived ? "Restore" : "Archive"} ${subject.name}`}
-                  >
-                    {subject.archived ? (
-                      <RotateCcw size={15} />
-                    ) : (
-                      <Archive size={15} />
-                    )}
-                  </button>
-                  <button
-                    aria-label={`Delete ${subject.name}`}
-                    onClick={() => {
-                      setDeleting(subject);
-                      setConfirmation("");
-                      setError("");
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
       )}
       <Modal
         open={!!editing}
@@ -592,21 +554,75 @@ export function SubjectsPage() {
           <fieldset className="r-color-field">
             <legend>Subject color</legend>
             <div>
-              {COLORS.map((c) => (
+              {SUBJECT_COLORS.map(([label, hex]) => (
                 <button
-                  key={c}
+                  key={hex}
                   type="button"
-                  style={{ background: c }}
-                  className="r-color-option"
-                  aria-label={`Color ${c}`}
-                  aria-pressed={color === c}
-                  onClick={() => setColor(c)}
+                  style={{ "--subject-color": hex } as React.CSSProperties}
+                  className="r-color-option subject-color-swatch"
+                  aria-label={label}
+                  aria-pressed={color.toLowerCase() === hex.toLowerCase()}
+                  onKeyDown={(event) => {
+                    const direction =
+                      event.key === "ArrowRight" || event.key === "ArrowDown"
+                        ? 1
+                        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                          ? -1
+                          : 0;
+                    if (!direction) return;
+                    event.preventDefault();
+                    const options = Array.from(
+                      event.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>(
+                        "button",
+                      ),
+                    );
+                    options[
+                      (options.indexOf(event.currentTarget) +
+                        direction +
+                        options.length) %
+                        options.length
+                    ].focus();
+                  }}
+                  onClick={() => setColor(hex)}
                 >
-                  {color === c && <Check size={16} />}
+                  {color.toLowerCase() === hex.toLowerCase() && (
+                    <Check size={16} />
+                  )}
                 </button>
               ))}
             </div>
+            <label className="subject-custom-color">
+              Custom color{" "}
+              <input
+                type="color"
+                aria-label="Custom subject color"
+                value={color}
+                onChange={(event) => setColor(event.target.value)}
+              />
+            </label>
           </fieldset>
+          <div className="subject-color-preview" aria-label="Folder preview">
+            <SubjectCover
+              subject={
+                {
+                  id: editing === "new" ? 0 : editing?.id || 0,
+                  name: name || "Your subject",
+                  color,
+                  icon,
+                  archived: false,
+                  weekly_goal_minutes: Number(goal) || 0,
+                } as Subject
+              }
+              count={
+                topics.filter(
+                  (t) => editing !== "new" && t.subject === editing?.id,
+                ).length
+              }
+              totals={stats?.subjects.find(
+                (s) => editing !== "new" && s.id === editing?.id,
+              )}
+            />
+          </div>
           <label className="field">
             Weekly target <span className="r-meta">Optional, in minutes</span>
             <input
@@ -672,109 +688,87 @@ export function SubjectsPage() {
           </div>
         </form>
       </Modal>
-      <Modal
-        open={!!topicSubject}
-        onOpenChange={(v) => {
-          if (!v && !saving) {
+      {topicSubject && (
+        <SubjectExplorer
+          subject={topicSubject}
+          topics={topics.filter((t) => t.subject === topicSubject.id)}
+          totals={stats?.subjects.find((s) => s.id === topicSubject.id)}
+          origin={subjectOrigin.current}
+          onClose={() => {
             setTopicSubject(null);
             setTopicDelete(null);
-          }
-        }}
-        title={`Inside ${topicSubject?.name || "your subject"}.`}
-        description="Topics are optional. Add one when a little more detail feels useful."
-      >
-        <div className="r-topic-list">
-          {topics
-            .filter((t) => t.subject === topicSubject?.id)
-            .map((topic) => (
-              <div key={topic.id}>
-                <span>{topic.name}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Rename ${topic.name}`}
-                  onClick={() => {
-                    setTopicEdit(topic);
-                    setTopicName(topic.name);
-                    setTopicDelete(null);
-                    setError("");
-                  }}
-                >
-                  <Edit3 size={14} />
+          }}
+          onRename={(topic) => {
+            setTopicEdit(topic);
+            setTopicName(topic.name);
+            setTopicDelete(null);
+            setError("");
+          }}
+          onDelete={(topic) => {
+            setTopicDelete(topic);
+            setError("");
+          }}
+        >
+          {topicDelete ? (
+            <div className="r-inline-confirm">
+              <p>
+                Delete “{topicDelete.name}”? Topics used in a session are
+                protected.
+              </p>
+              <ErrorNote message={error} />
+              <div className="r-form-actions">
+                <Button variant="ghost" onClick={() => setTopicDelete(null)}>
+                  Cancel
                 </Button>
                 <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Delete ${topic.name}`}
-                  onClick={() => {
-                    setTopicDelete(topic);
-                    setError("");
-                  }}
+                  variant="destructive"
+                  onClick={removeTopic}
+                  disabled={saving}
                 >
-                  <Trash2 size={14} />
+                  {saving ? "Deleting…" : "Delete topic"}
                 </Button>
               </div>
-            ))}
-        </div>
-        {topicDelete ? (
-          <div className="r-inline-confirm">
-            <p>
-              Delete “{topicDelete.name}”? Topics used in a session are
-              protected.
-            </p>
-            <ErrorNote message={error} />
-            <div className="r-form-actions">
-              <Button variant="ghost" onClick={() => setTopicDelete(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={removeTopic}
-                disabled={saving}
-              >
-                {saving ? "Deleting…" : "Delete topic"}
-              </Button>
             </div>
-          </div>
-        ) : (
-          <form className="r-form" onSubmit={saveTopic}>
-            <label className="field">
-              {topicEdit ? "Rename topic" : "New topic"}
-              <input
-                className="input"
-                maxLength={100}
-                value={topicName}
-                onChange={(e) => setTopicName(e.target.value)}
-                placeholder="e.g. Reaction mechanisms"
-                required
-              />
-            </label>
-            <ErrorNote message={error} />
-            <div className="r-form-actions">
-              {topicEdit && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setTopicEdit(null);
-                    setTopicName("");
-                  }}
-                >
-                  Cancel edit
+          ) : (
+            <form className="r-form" onSubmit={saveTopic}>
+              <label className="field">
+                {topicEdit ? "Rename topic" : "New topic"}
+                <input
+                  className="input"
+                  maxLength={100}
+                  value={topicName}
+                  onChange={(e) => setTopicName(e.target.value)}
+                  placeholder="e.g. Reaction mechanisms"
+                  required
+                />
+              </label>
+              <ErrorNote message={error} />
+              <div className="r-form-actions">
+                {topicEdit && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setTopicEdit(null);
+                      setTopicName("");
+                    }}
+                  >
+                    Cancel edit
+                  </Button>
+                )}
+                <Button disabled={saving || !topicName.trim()}>
+                  {saving ? "Saving…" : topicEdit ? "Save topic" : "Add topic"}
                 </Button>
-              )}
-              <Button disabled={saving || !topicName.trim()}>
-                {saving ? "Saving…" : topicEdit ? "Save topic" : "Add topic"}
-              </Button>
-            </div>
-          </form>
-        )}
-      </Modal>
+              </div>
+            </form>
+          )}
+        </SubjectExplorer>
+      )}
     </div>
   );
 }
 
-function SessionEditor({
+export function SessionEditor({
   session,
   onClose,
   onSaved,
@@ -1250,346 +1244,6 @@ export function HistoryPage() {
               ))}
             </section>
           ))}
-        </>
-      )}
-      <SessionEditor
-        session={editing}
-        onClose={() => setEditing(null)}
-        onSaved={remote.retry}
-      />
-    </div>
-  );
-}
-
-type CalendarData = {
-  days: (DayStat & { session_ids?: number[] })[];
-  sessions: StudySession[];
-};
-export function CalendarPage() {
-  const { preferences, user, openAuth } = useSesh();
-  const today = dateKey(new Date(), preferences.timezone);
-  const [view, setView] = useState<"month" | "week" | "year">("month"),
-    [cursor, setCursor] = useState(today),
-    [selected, setSelected] = useState(today),
-    [editing, setEditing] = useState<StudySession | "new" | null>(null);
-  const dayButtons = useRef(new Map<string, HTMLButtonElement>());
-  const start =
-    view === "year"
-      ? cursor.slice(0, 4) + "-01-01"
-      : view === "week"
-        ? weekStart(cursor, preferences.week_start)
-        : weekStart(monthStart(cursor), preferences.week_start);
-  const end =
-    view === "year"
-      ? cursor.slice(0, 4) + "-12-31"
-      : view === "week"
-        ? dayAdd(start, 6)
-        : dayAdd(weekStart(monthEnd(cursor), preferences.week_start), 6);
-  const remote = useRemote<CalendarData>(`/calendar/?from=${start}&to=${end}`);
-  const dates = useMemo(() => {
-    const list: string[] = [];
-    for (let date = start; date <= end; date = dayAdd(date, 1)) list.push(date);
-    return list;
-  }, [start, end]);
-  const dayMap = new Map(
-    (remote.data?.days || []).map((day) => [day.date, day]),
-  );
-  const currentDay = dayMap.get(selected);
-  const sessions = (remote.data?.sessions || []).filter((s) =>
-    currentDay?.session_ids
-      ? currentDay.session_ids.includes(s.id)
-      : dateKey(new Date(s.started_at), preferences.timezone) === selected,
-  );
-  const weekNames = Array.from(
-    { length: 7 },
-    (_, i) => WEEKDAYS[(i + preferences.week_start) % 7],
-  );
-  function move(direction: number) {
-    let next;
-    if (view === "year")
-      next = String(Number(cursor.slice(0, 4)) + direction) + "-01-01";
-    else if (view === "month") next = monthAdd(cursor, direction);
-    else next = dayAdd(cursor, direction * 7);
-    setCursor(next);
-    setSelected(next);
-  }
-  function selectDate(date: string) {
-    setSelected(date);
-    if (date < start || date > end) setCursor(date);
-  }
-  function keyboard(e: KeyboardEvent<HTMLButtonElement>, date: string) {
-    const offsets: Record<string, number> = {
-      ArrowLeft: view === "year" ? -7 : -1,
-      ArrowRight: view === "year" ? 7 : 1,
-      ArrowUp: view === "year" ? -1 : -7,
-      ArrowDown: view === "year" ? 1 : 7,
-      Home: -((weekday(date) - preferences.week_start + 7) % 7),
-      End: 6 - ((weekday(date) - preferences.week_start + 7) % 7),
-    };
-    if (!(e.key in offsets)) return;
-    e.preventDefault();
-    const next = dayAdd(date, offsets[e.key]);
-    selectDate(next);
-    requestAnimationFrame(() => dayButtons.current.get(next)?.focus());
-  }
-  useEffect(() => {
-    if (
-      selected >= start &&
-      selected <= end &&
-      document.activeElement?.classList.contains("r-calendar-day")
-    )
-      dayButtons.current.get(selected)?.focus();
-  }, [start, end, selected]);
-  const title =
-    view === "year"
-      ? cursor.slice(0, 4)
-      : view === "week"
-        ? `${dayLabel(start)} – ${dayLabel(end, { month: "short", day: "numeric", year: "numeric" })}`
-        : dayLabel(cursor, { month: "long", year: "numeric" });
-  function dateButton(date: string) {
-    const day = dayMap.get(date);
-    const seconds = day?.seconds || 0;
-    const ratio =
-      seconds /
-      (Math.max(day?.goal_minutes || preferences.daily_goal_minutes, 1) * 60);
-    const intensity =
-      seconds === 0
-        ? 0
-        : ratio < 0.25
-          ? 1
-          : ratio < 0.6
-            ? 2
-            : ratio < 1
-              ? 3
-              : 4;
-    return (
-      <button
-        key={date}
-        ref={(node) => {
-          if (node) dayButtons.current.set(date, node);
-          else dayButtons.current.delete(date);
-        }}
-        className={`r-calendar-day r-intensity-${intensity}${day?.goal_achieved ? " r-goal-met" : ""}${day?.is_rest_day ? " r-rest-day" : ""}${date === today ? " r-today" : ""}${date === selected ? " r-selected" : ""}${view === "month" && date.slice(0, 7) !== cursor.slice(0, 7) ? " r-other-month" : ""}`}
-        aria-label={`${dayLabel(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}, ${duration(seconds)} studied${day?.goal_achieved ? ", goal achieved" : ""}${day?.is_rest_day ? ", rest day" : ""}`}
-        aria-pressed={selected === date}
-        tabIndex={date === selected ? 0 : -1}
-        onKeyDown={(e) => keyboard(e, date)}
-        onClick={() => selectDate(date)}
-        title={`${dayLabel(date)} · ${duration(seconds)}${day?.is_rest_day ? " · Rest day" : ""}`}
-      >
-        <span className="r-date-number">
-          {Number(date.slice(-2))}
-          {date === today && <i />}
-        </span>
-        {view !== "year" && (
-          <>
-            <span className="r-calendar-time">
-              {seconds > 0
-                ? duration(seconds, true)
-                : day?.is_rest_day
-                  ? "Rest day"
-                  : ""}
-            </span>
-            <span className="r-calendar-status">
-              {day?.goal_achieved ? (
-                <Check size={12} aria-hidden="true" />
-              ) : day?.is_rest_day ? (
-                <Leaf size={12} aria-hidden="true" />
-              ) : null}
-            </span>
-          </>
-        )}
-      </button>
-    );
-  }
-  return (
-    <div className="reflection">
-      <Header
-        eyebrow="Study index / Calendar"
-        title="Your study calendar."
-        description="Choose a day to see its sessions and progress."
-      />
-      <div className="r-calendar-toolbar">
-        <div className="r-calendar-nav">
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={`Previous ${view}`}
-            onClick={() => move(-1)}
-          >
-            <ChevronLeft size={18} />
-          </Button>
-          <h2>{title}</h2>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={`Next ${view}`}
-            onClick={() => move(1)}
-          >
-            <ChevronRight size={18} />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setCursor(today);
-              setSelected(today);
-            }}
-          >
-            Today
-          </Button>
-        </div>
-        <div className="r-segmented" aria-label="Calendar view">
-          {(["week", "month", "year"] as const).map((v) => (
-            <button
-              key={v}
-              aria-pressed={view === v}
-              onClick={() => {
-                setView(v);
-                setCursor(selected);
-              }}
-            >
-              {v[0].toUpperCase() + v.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-      {remote.loading ? (
-        <Loading />
-      ) : remote.error ? (
-        <RemoteError error={remote.error} retry={remote.retry} />
-      ) : (
-        <>
-          <div className={`r-calendar r-calendar-${view}`}>
-            {view === "year" ? (
-              <>
-                <div className="r-year-months">
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <span key={i}>
-                      {new Date(2000, i, 1).toLocaleDateString("en-US", {
-                        month: "short",
-                      })}
-                    </span>
-                  ))}
-                </div>
-                <div
-                  className="r-year-heatmap"
-                  role="group"
-                  aria-label={`Study activity in ${cursor.slice(0, 4)}`}
-                >
-                  {Array.from(
-                    {
-                      length: (weekday(start) - preferences.week_start + 7) % 7,
-                    },
-                    (_, i) => (
-                      <span key={`blank${i}`} className="r-heatmap-blank" />
-                    ),
-                  )}
-                  {dates.map(dateButton)}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="r-weekday-labels">
-                  {weekNames.map((name) => (
-                    <span key={name}>{name.slice(0, 3)}</span>
-                  ))}
-                </div>
-                <div
-                  className="r-calendar-grid"
-                  role="group"
-                  aria-label={`${view === "month" ? "Monthly" : "Weekly"} study calendar`}
-                >
-                  {dates.map(dateButton)}
-                </div>
-              </>
-            )}
-          </div>
-          <div className="r-calendar-legend">
-            <span>Less</span>
-            <div className="r-intensity-legend">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <i key={i} className={`r-intensity-${i}`} />
-              ))}
-            </div>
-            <span>More focus</span>
-            <span className="r-legend-separator" />
-            <span>
-              <Check size={13} /> Goal met
-            </span>
-            <span>
-              <Leaf size={13} /> Rest day
-            </span>
-            <span className="r-calendar-timezone">{preferences.timezone}</span>
-          </div>
-          <motion.section
-            key={selected}
-            initial={{ y: 7 }}
-            animate={{ y: 0 }}
-            className="r-day-detail"
-          >
-            <div className="r-day-detail-title">
-              <div>
-                <p className="eyebrow">A closer look</p>
-                <h2>
-                  {dayLabel(selected, {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </h2>
-              </div>
-              <div className="r-day-total">
-                <strong>{duration(currentDay?.seconds || 0)}</strong>
-                <span>
-                  {currentDay?.is_rest_day
-                    ? "A planned day to rest"
-                    : currentDay?.goal_achieved
-                      ? "Daily goal reached"
-                      : `of ${duration((currentDay?.goal_minutes || preferences.daily_goal_minutes) * 60)} daily goal`}
-                </span>
-              </div>
-            </div>
-            {sessions.length ? (
-              <>
-                <p className="r-meta">
-                  {sessions.length}{" "}
-                  {sessions.length === 1 ? "session" : "sessions"} touched this
-                  day. Session rows show their full duration.
-                </p>
-                {sessions.map((session) => (
-                  <SessionRow
-                    key={session.id}
-                    session={session}
-                    onClick={() => setEditing(session)}
-                    timeZone={preferences.timezone}
-                  />
-                ))}
-              </>
-            ) : (
-              <div className="r-day-empty">
-                <span>
-                  {currentDay?.is_rest_day ? (
-                    <Leaf size={21} strokeWidth={1.3} />
-                  ) : (
-                    <BookOpen size={21} strokeWidth={1.3} />
-                  )}
-                </span>
-                <p>
-                  {selected > today
-                    ? "A little space for what’s ahead."
-                    : currentDay?.is_rest_day
-                      ? "Rest is part of a sustainable rhythm."
-                      : "No study sessions on this day."}
-                </p>
-                {!user && (
-                  <Button variant="ghost" size="sm" onClick={openAuth}>
-                    Sign in to begin <ArrowRight size={14} />
-                  </Button>
-                )}
-              </div>
-            )}
-          </motion.section>
         </>
       )}
       <SessionEditor

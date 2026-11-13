@@ -1,0 +1,36 @@
+{
+  "mode": "Built-in image generation; original artwork",
+  "direction": "Original delicate watercolor botanical illustration; pigment granulation, natural petal details, warm ivory and muted green leaves, transparent background, no text or rectangular backdrop. A consistent natural-history collection.",
+  "associationSource": "https://extension.illinois.edu/sites/default/files/floriography_flowers.pdf",
+  "note": "Cultural editorial month associations, not scientific rules. Generic illustrations are intentionally not assigned species names.",
+  "sources": {
+    "january": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-ab36b263-358f-40b1-824f-21eac69c8eca.png",
+    "february": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-6d8dbe22-9245-48ad-b156-b4ef1bccc530.png",
+    "march": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-a34f0976-c69a-4931-9023-e698ccf4941d.png",
+    "april": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-bacc7445-647b-4fed-9718-500990081c15.png",
+    "may": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-011598c4-3969-4565-94d6-cc99d12a72c4.png",
+    "june": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-27e7b616-13cd-4148-bf43-a46786ad1cab.png",
+    "july": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-1347dfe5-272a-46dd-a83d-e783553daae8.png",
+    "august": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-7547ff13-5607-4c0f-b660-39fb5b82dd8a.png",
+    "september": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-a4714238-f7ff-4cdf-afa8-72d54b494d89.png",
+    "october": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-ae07c36f-7085-4530-9d50-d19f25707782.png",
+    "november": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-f5cba126-782e-4c78-b0c8-48e096967ef5.png",
+    "december": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-08dc2c62-de72-4abd-a137-e78b73dd065f.png",
+    "lily": "/Users/sas/.codex/generated_images/01a18d84-fa20-73a1-96e8-71b82e8a7ba1/exec-2f0a5cc4-93c0-4fd7-a06e-7749dd0fff3f.png"
+  },
+  "promptSubjects": {
+    "january": "A dusty pink carnation bloom with softly ruffled petals and a short stem.",
+    "february": "A violet sprig with three purple five-petaled flowers and heart-shaped leaves.",
+    "march": "A warm yellow daffodil with six tepals and a distinct central trumpet.",
+    "april": "Three lavender-pink sweet pea flowers with a delicate curling tendril.",
+    "may": "Lily of the valley with small ivory bells and two muted green leaves.",
+    "june": "A dusty blush pink rose with naturally layered petals.",
+    "july": "A short spike of muted blue larkspur flowers.",
+    "august": "A short gladiolus stem with soft peach flowers.",
+    "september": "Three lavender aster flowers with warm golden centers.",
+    "october": "An apricot calendula bloom with fine layered petals and a short leafy stem.",
+    "november": "A pale dusty pink chrysanthemum with many delicately layered curling petals.",
+    "december": "Paperwhite narcissus flowers with six ivory tepals and small pale central cups.",
+    "lily": "An open soft pink lily with six recurved speckled tepals and visible stamens."
+  }
+}

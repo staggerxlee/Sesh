@@ -161,3 +161,16 @@ class PersonalCover(models.Model):
     # Store only bounded, re-encoded derivatives. No media path or public URL.
     wide = models.BinaryField(null=True)
     small = models.BinaryField(null=True)
+
+
+class CalendarNote(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    kind = models.CharField(max_length=7, choices=[('daily', 'daily'), ('monthly', 'monthly'), ('motto', 'motto')])
+    date = models.DateField()
+    text = models.TextField(blank=True, max_length=5000)
+    cover = models.CharField(max_length=12, blank=True)
+    revision = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'kind', 'date'], name='unique_calendar_note')]
