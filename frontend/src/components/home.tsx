@@ -149,7 +149,7 @@ export function Home({ indexOnly = false }: { indexOnly?: boolean }) {
       <div className="studio-spread" id="study-index">
         <section className="salon-library">
           <div className="index-label">
-            <span>01 / THE LISTENING ROOM</span>
+            <span>01 / SHRI’S STUDY ROOM</span>
             <span>SOUND EDITIONS</span>
           </div>
           <h2>Choose an atmosphere.</h2>

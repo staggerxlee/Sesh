@@ -420,7 +420,9 @@ function EntryTitle() {
   return (
     <div className="entry-title">
       <h1 style={{ visibility: showWords ? "hidden" : undefined }}>
-        The Listening
+        Shri’s
+        <br />
+        Study
         <br />
         <em>Room.</em>
       </h1>
@@ -907,7 +909,7 @@ export function ActiveFocus() {
       {show && !active && !summary && (
         <div className="room-setup-hud">
           <span className="scene-rubric">
-            PRIVATE SALON &nbsp; / &nbsp; SESSION SETUP
+            SHRI’S STUDY ROOM &nbsp; / &nbsp; SESSION SETUP
           </span>
           <EntryTitle />
           <FocusSetup />
