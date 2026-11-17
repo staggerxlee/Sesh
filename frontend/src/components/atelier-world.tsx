@@ -12,8 +12,10 @@ import { CoffeeSteam } from "./coffee-steam";
 import { finishWood, WindowLight } from "./room-materials";
 import { pianistState, type PianistState } from "@/lib/pianist";
 import type { Sound } from "@/lib/cinema-audio";
+import { dayKeys, daySegment, type RoomDay } from "@/lib/room-day";
 export type CameraMode = "home" | "enter" | "focus" | "complete" | "retreat";
 export interface WorldProps {
+  day?: RoomDay;
   parked: boolean;
   mode: CameraMode;
   onSettled: (mode: CameraMode) => void;
@@ -111,6 +113,26 @@ function Model({
   ]);
   const scene = useMemo(() => clone(actor.scene), [actor]),
     mixer = useMemo(() => new T.AnimationMixer(scene), [scene]);
+  const roomMaterials = useMemo(() => {
+    const materials = new Set<T.MeshStandardMaterial>();
+    room.scene.traverse((obj) => {
+      if (
+        obj instanceof T.Mesh &&
+        obj.material instanceof T.MeshStandardMaterial
+      )
+        materials.add(obj.material);
+    });
+    return [...materials];
+  }, [room]);
+  const dayColors = useMemo(
+    () => new Map(dayKeys.map((k) => [k.color, new T.Color(k.color)])),
+    [],
+  );
+  const tint = useMemo(() => new T.Color(), []);
+  const ambient = useRef<T.HemisphereLight>(null),
+    lamp = useRef<T.PointLight>(null);
+  const shadowAt = useRef(0);
+  const head = useMemo(() => scene.getObjectByName("Head"), [scene]);
   const progress = useRef(0),
     state = useRef<PianistState>("Idle"),
     group = useRef<T.Group>(null),
@@ -296,9 +318,16 @@ function Model({
       a.time = p.playhead() % clip.duration;
     }
     if (v > 0) mixer.update(dt);
+    for (const material of roomMaterials) {
+      if (material.userData.roomWind)
+        material.userData.roomWind.value =
+          p.day && p.moving && p.effects ? 1 : 0;
+      if (material.userData.roomWindTime)
+        material.userData.roomWindTime.value = clock.elapsedTime;
+    }
     const rain = interior && p.effects && p.sound === "rain",
       lofi = interior && p.effects && p.sound === "lofi";
-    if (light.current) {
+    if (light.current && !p.day) {
       light.current.color.lerp(
         new T.Color(
           rain
@@ -317,6 +346,50 @@ function Model({
         3,
         dt,
       );
+    }
+    if (p.day && light.current) {
+      const { a, b, t, phase } = daySegment(p.day.read());
+      const lerp = (x: number, y: number) => T.MathUtils.lerp(x, y, t);
+      tint.copy(dayColors.get(a.color)!).lerp(dayColors.get(b.color)!, t);
+      light.current.color.lerp(tint, 1 - Math.exp(-dt * 2));
+      light.current.intensity = T.MathUtils.damp(
+        light.current.intensity,
+        lerp(a.sun, b.sun) * (rain ? 0.45 : 1),
+        2,
+        dt,
+      );
+      const angle = (phase / 3600) * Math.PI * 2;
+      light.current.position.set(
+        3.8 * Math.cos(angle),
+        3.5 + 1.1 * Math.sin(angle),
+        -5.2,
+      );
+      light.current.shadow.radius = lerp(a.night, b.night) * 2 + 2;
+      if (ambient.current)
+        ambient.current.intensity = T.MathUtils.damp(
+          ambient.current.intensity,
+          lerp(a.ambient, b.ambient),
+          2,
+          dt,
+        );
+      if (lamp.current)
+        lamp.current.intensity = T.MathUtils.damp(
+          lamp.current.intensity,
+          lerp(a.lamp, b.lamp),
+          2,
+          dt,
+        );
+      if (clock.elapsedTime - shadowAt.current > 1) {
+        gl.shadowMap.needsUpdate = true;
+        shadowAt.current = clock.elapsedTime;
+      }
+    }
+    // Keep the existing hand/key tracks intact; add long, mellow head phrasing.
+    if (p.day && head && s === "Playing" && p.moving) {
+      const t = p.playhead();
+      head.rotation.y +=
+        0.035 * Math.sin(t * 0.19) + 0.018 * Math.sin(t * 0.071);
+      head.rotation.z += 0.018 * Math.sin(t * 0.13);
     }
     if (pianoLight.current)
       pianoLight.current.intensity = T.MathUtils.damp(
@@ -341,7 +414,8 @@ function Model({
       !document.hidden &&
       !p.parked &&
       inView.current &&
-      ((p.moving && (p.effects || v !== dest || (isPiano && p.playing))) ||
+      (!!p.day ||
+        (p.moving && (p.effects || v !== dest || (isPiano && p.playing))) ||
         (pianoLight.current &&
           Math.abs(pianoLight.current.intensity - (isPiano ? 2.5 : 0.75)) >
             0.025) ||
@@ -357,14 +431,20 @@ function Model({
   return (
     <>
       <color attach="background" args={["#17181a"]} />
-      <SalonSky sound={interior && p.effects ? p.sound : "nature"} />
+      <SalonSky
+        sound={interior && p.effects ? p.sound : "nature"}
+        day={p.day}
+        moving={p.moving && p.effects}
+      />
       <Sunbeams
         on={
-          p.effects && (!interior || (p.sound !== "rain" && p.sound !== "lofi"))
+          !p.day &&
+          p.effects &&
+          (!interior || (p.sound !== "rain" && p.sound !== "lofi"))
         }
       />
       <fog attach="fog" args={["#8f7765", 8, 25]} />
-      <hemisphereLight args={["#d6d1cd", "#745b47", 0.72]} />
+      <hemisphereLight ref={ambient} args={["#d6d1cd", "#745b47", 0.72]} />
       <directionalLight
         ref={light}
         position={[3.8, 3.58, -5.2]}
@@ -377,6 +457,7 @@ function Model({
         shadow-camera-bottom={-4}
       />
       <pointLight
+        ref={lamp}
         position={[2.43, 1.72, -0.4]}
         color="#ffc28e"
         intensity={5.0}
@@ -398,6 +479,7 @@ function Model({
         target={leoTarget}
       />
       <WindowLight
+        day={p.day}
         warm={!interior || (p.sound !== "rain" && p.sound !== "lofi")}
       />
       <mesh position={[0, 3.42, 0]} rotation={[Math.PI / 2, 0, 0]}>

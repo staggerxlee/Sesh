@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { broadcast, useSesh } from "@/lib/store";
 import type { PersonalCover } from "@/lib/types";
 
+import { ShriName } from "./shri-name";
 const empty: PersonalCover = {
   words: "",
   show_on_entry: false,
@@ -117,24 +118,17 @@ export function PersonalHero({
         )}
         <div className="mast-copy">
           <div className="index-label">
-            <span className="signal" /> SESH &nbsp; / &nbsp; THE LISTENING ROOM
+            <span className="signal" /> SESH &nbsp; / &nbsp;{" "}
+            SHRI’S LITTLE CORNER
           </div>
-          <h1
-            className={
-              words
-                ? words.length > 85 || words.split("\n").length > 3
-                  ? "long-words"
-                  : "own-words"
-                : ""
-            }
-          >
-            {words || (
-              <>
-                <span>A Calmer</span> <em>You.</em>
-              </>
-            )}
+          <h1 className="shri-room-title">
+            <ShriName />’s
+            <br />
+            Study Room.
           </h1>
-          <p className="hero-intro">A private space for study and sound.</p>
+          <p className="hero-intro shri-message">
+            {words || "A little closer to your dreams, Shri."}
+          </p>
           <button className="begin-salon" onClick={() => enterSalon()}>
             Begin Focus <ArrowRight size={17} />
           </button>

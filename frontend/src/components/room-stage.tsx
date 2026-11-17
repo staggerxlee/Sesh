@@ -4,6 +4,7 @@ import {
   Component,
   type ReactNode,
   useCallback,
+  useMemo,
   useEffect,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import type { CameraMode } from "./atelier-world";
 import { useSesh } from "@/lib/store";
 import { RoomMix, type Sound } from "@/lib/cinema-audio";
 import type { PianistState } from "@/lib/pianist";
+import { RoomDay, type AtmosphereMode } from "@/lib/room-day";
 const World = dynamic(() => import("./atelier-world"), { ssr: false });
 class Guard extends Component<
   { children: ReactNode; failed: () => void },
@@ -43,7 +45,12 @@ export function RoomStage({
   onLeave: () => void;
   exit: () => void;
 }) {
-  const { preferences, active } = useSesh();
+  const { preferences, active, user } = useSesh();
+  const day = useMemo(
+    () => new RoomDay(preferences.timezone),
+    [preferences.timezone, user?.id],
+  );
+  const [atmosphere, setAtmosphere] = useState<AtmosphereMode>("cycle");
   const backgroundSession = parked && !!active;
   const mix = useRef<RoomMix | null>(null),
     closeTask = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
@@ -189,6 +196,7 @@ export function RoomStage({
             <div className="cinema-canvas">
               <Guard failed={onSlow}>
                 <World
+                  day={day}
                   parked={parked}
                   mode={backgroundSession ? "focus" : mode}
                   onSettled={onSettled}
@@ -215,7 +223,8 @@ export function RoomStage({
       <div className="cinema-veil" />
       {!home && (
         <div className="cinema-id">
-          S / 01 &nbsp; THE LISTENING ROOM{" "}
+          S / 01 &nbsp;{" "}
+          SHRI’S LITTLE CORNER{" "}
           <span>
             {quiet
               ? "MINIMAL"
@@ -237,6 +246,22 @@ export function RoomStage({
             {panel && (
               <div className="sound-panel">
                 <span className="index-label">SOUND ENVIRONMENT</span>
+                <label>
+                    Atmosphere
+                    <select
+                      aria-label="Room atmosphere"
+                      value={atmosphere}
+                      onChange={(e) => {
+                        const mode = e.target.value as AtmosphereMode;
+                        day.setMode(mode);
+                        setAtmosphere(mode);
+                      }}
+                    >
+                      <option value="cycle">One-hour day cycle</option>
+                      <option value="local">Match local time</option>
+                      <option value="hold">Stay in current atmosphere</option>
+                    </select>
+                </label>
                 <div className="sound-list">
                   {salonEditions.map(({ sound: v, title }) => (
                     <button

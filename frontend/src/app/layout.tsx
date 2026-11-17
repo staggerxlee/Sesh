@@ -4,8 +4,9 @@ import "./atelier.css";
 import "./salon.css";
 import "./navigation.css";
 import "./clock.css";
+import "./shri.css";
 export const metadata: Metadata = {
-  title: "Sesh — Study Atelier",
+  title: "Sesh — Virtual Study Room",
   description:
     "A quiet space to study. Track your time, understand your rhythm, and make room for what matters.",
   icons: { icon: "/favicon.svg" },

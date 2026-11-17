@@ -1,4 +1,7 @@
 "use client";
+import { useFrame } from "@react-three/fiber";
+import { useRef } from "react";
+import { daySegment, type RoomDay } from "@/lib/room-day";
 import { useEffect, useMemo } from "react";
 import * as T from "three";
 // Baked vertex colors preserve one draw call. Warm surfaces receive a low-contrast
@@ -6,12 +9,23 @@ import * as T from "three";
 export function finishWood(material: T.MeshStandardMaterial) {
   if (material.userData.atelierGrain) return;
   material.userData.atelierGrain = true;
+  const wind = { value: 0 },
+    windTime = { value: 0 };
+  material.userData.roomWind = wind;
+  material.userData.roomWindTime = windTime;
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.roomWind = wind;
+    shader.uniforms.roomWindTime = windTime;
     shader.vertexShader =
-      "varying vec3 salonPosition;\n" +
+      "uniform float roomWind; uniform float roomWindTime; varying vec3 salonPosition;\n" +
       shader.vertexShader.replace(
         "#include <begin_vertex>",
-        "#include <begin_vertex>\nsalonPosition=position;",
+        `#include <begin_vertex>
+        salonPosition=position;
+        #ifdef USE_COLOR
+        float leaf=step(color.r*1.12,color.g)*step(color.b*1.2,color.g)*smoothstep(.8,2.1,position.y);
+        transformed.x+=roomWind*leaf*.006*sin(roomWindTime*.6+position.y*3.+position.x*4.);
+        #endif`,
       );
     shader.fragmentShader =
       "varying vec3 salonPosition;\n" +
@@ -35,10 +49,23 @@ export function finishWood(material: T.MeshStandardMaterial) {
       totalEmissiveRadiance+=lampshade*fluting*vec3(.83,.42,.14);`,
     );
   };
-  material.customProgramCacheKey = () => "salon-veneer-v1";
+  material.customProgramCacheKey = () => "salon-veneer-v2";
   material.needsUpdate = true;
 }
-export function WindowLight({ warm }: { warm: boolean }) {
+export function WindowLight({ warm, day }: { warm: boolean; day?: RoomDay }) {
+  const material = useRef<T.MeshBasicMaterial>(null);
+  useFrame((_, dt) => {
+    if (day && material.current) {
+      const { a, b, t } = daySegment(day.read());
+      const daylight = 1 - T.MathUtils.lerp(a.night, b.night, t);
+      material.current.opacity = T.MathUtils.damp(
+        material.current.opacity,
+        (warm ? 0.16 : 0.04) * daylight,
+        2,
+        Math.min(dt, 0.1),
+      );
+    }
+  });
   const map = useMemo(() => {
     const sheet = document.createElement("canvas");
     sheet.width = 256;
@@ -56,6 +83,7 @@ export function WindowLight({ warm }: { warm: boolean }) {
     <mesh position={[0.73, 0.082, 1.02]} rotation={[-Math.PI / 2, 0, -0.32]}>
       <planeGeometry args={[2.45, 1.3]} />
       <meshBasicMaterial
+        ref={material}
         map={map}
         transparent
         opacity={warm ? 0.19 : 0.038}

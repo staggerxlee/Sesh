@@ -1,0 +1,64 @@
+.shri-name {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  transition: color 0.3s;
+  outline-offset: 6px;
+}
+.shri-name:hover,
+.shri-name:focus-visible {
+  color: #e6c5b9;
+}
+.shri-hearts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: serif;
+  font-weight: normal;
+}
+.shri-hearts > span {
+  position: absolute;
+  top: 25%;
+  opacity: 0;
+  animation: shri-paper 1.45s cubic-bezier(0.2, 0.6, 0.4, 1) both;
+}
+@keyframes shri-paper {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0);
+  }
+  20% {
+    opacity: 0.7;
+  }
+  60% {
+    transform: translate(calc(var(--dx) * 0.5), -29px) rotate(var(--turn));
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(var(--dx), -55px) rotate(calc(var(--turn) * 1.5));
+    opacity: 0;
+  }
+}
+.shri-room-title {
+  font-size: clamp(48px, 6.2vw, 110px) !important;
+  max-width: 10ch;
+  line-height: 0.98 !important;
+}
+.shri-message {
+  max-width: 32ch !important;
+  line-height: 1.55 !important;
+  color: #f0e2cd !important;
+}
+.sound-panel select {
+  max-width: 100%;
+  background: #211d1a;
+  color: #f1e5d2;
+  border: 1px solid #66574a;
+  padding: 8px;
+  font: inherit;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shri-hearts {
+    display: none;
+  }
+}
