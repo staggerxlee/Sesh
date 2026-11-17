@@ -48,6 +48,24 @@ class AuthTests(TestCase):
         self.assertEqual(self.client.post('/api/v1/auth/login/', {'email': 'PERSON@Example.com', 'password': 'wrong'}, format='json').status_code, 401)
         self.assertEqual(self.client.post('/api/v1/auth/login/', {'email': 'PERSON@Example.com', 'password': 'calm-study-phrase-138'}, format='json').status_code, 200)
 
+    @override_settings(EMAIL_BACKEND='study.email_backend.BrevoEmailBackend', BREVO_API_KEY='')
+    def test_accounts_work_without_email_and_reset_reports_unavailability_privately(self):
+        self.csrf()
+        with self.assertLogs('study.views', level='ERROR'):
+            registered = self.client.post('/api/v1/auth/register/', {
+                'email': 'beta@example.com', 'password': 'calm-study-phrase-138'}, format='json')
+        self.assertEqual(registered.status_code, 201)
+        self.assertFalse(registered.data['verification_sent'])
+        self.assertFalse(registered.data['user']['email_verified'])
+        self.assertEqual(self.client.get('/api/v1/auth/me/').status_code, 200)
+        self.client.credentials(HTTP_X_CSRFTOKEN=registered.data['csrfToken'])
+        known = self.client.post('/api/v1/auth/password-reset/', {'email': 'beta@example.com'}, format='json')
+        unknown = self.client.post('/api/v1/auth/password-reset/', {'email': 'nobody@example.com'}, format='json')
+        self.assertEqual(known.status_code, 503)
+        self.assertEqual(unknown.status_code, 503)
+        self.assertEqual(known.data, unknown.data)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_password_reset_is_private_and_single_use(self):
         from django.contrib.auth.tokens import default_token_generator
         from django.utils.encoding import force_bytes

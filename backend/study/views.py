@@ -139,6 +139,10 @@ def logout_view(request):
 @csrf_protect
 def password_reset_view(request):
     email = serializers.EmailField().run_validation(request.data.get('email', '')).strip().lower()
+    # The initial hosted beta can run before the email provider is activated.
+    # Return the same availability message for every address to avoid account enumeration.
+    if settings.EMAIL_BACKEND == 'study.email_backend.BrevoEmailBackend' and not settings.BREVO_API_KEY:
+        return Response({'detail': 'Password-reset emails are not available yet. Please try again once email delivery is enabled.'}, status=503)
     user = User.objects.filter(email__iexact=email, is_active=True).first()
     if user:
         uid = urlsafe_base64_encode(force_bytes(user.pk))

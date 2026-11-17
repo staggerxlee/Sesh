@@ -4,6 +4,16 @@ Use **Vercel Hobby** (website), **Render Free** (Django), **Neon Free** (Postgre
 
 Repository: https://github.com/staggerxlee/Sesh — branch `main`.
 
+## Current deployment and deferred email setup — November 17, 2026
+
+- Frontend: https://sesh-beta.vercel.app
+- Backend: https://sesh-api-um2g.onrender.com
+- The owner explicitly deferred Brevo phone verification because the SMS code did not arrive. Leave `BREVO_API_KEY` empty until activation is completed; never use a fake key or log account email links.
+- Registration and password sign-in remain available, and accounts stay unverified until their owners verify them. Password-reset emails are unavailable during this interim setup.
+- To finish later: complete Brevo phone verification, create `Sesh production email` with **Restricted → Transactional email: All** (all other categories None), and save the generated key only in Render's `BREVO_API_KEY`. The approved scope includes sending, templates, block lists, and delivery logs. The prepared key expiry was November 17, 2027, or 90 unused days; confirm the actual expiry when generating it.
+- Verified sender: `Sesh <saswatkc123@gmail.com>`. After enabling the key, test verification and password-reset email delivery on the public frontend.
+- These URLs identify the provisioned services; use the verification checklist below before treating the full deployment as ready.
+
 ## 1. Neon — saved accounts and study data
 
 1. Sign in at [Neon](https://console.neon.tech/) and create a **Free** project called `sesh`.
