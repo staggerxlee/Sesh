@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowLeft, Mail, Loader2 } from "lucide-react";
 import { Modal } from "./ui/modal";
 import { Button } from "./ui/button";
-import { api, clearCsrf, csrf } from "@/lib/api";
+import { api, clearCsrf, csrf, prepareAuth } from "@/lib/api";
 import { broadcast, useSesh } from "@/lib/store";
 export function AuthDialog() {
   const { authOpen, setAuthOpen, refresh, notify } = useSesh();
@@ -14,6 +14,9 @@ export function AuthDialog() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [waking, setWaking] = useState(false);
+  const request = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [token, setToken] = useState("");
@@ -32,20 +35,42 @@ export function AuthDialog() {
     setSent(false);
     setPassword("");
   }, [mode]);
+  useEffect(() => {
+    request.current?.abort();
+    request.current = null;
+    setBusy(false);
+    setConnecting(false);
+    setWaking(false);
+    return () => request.current?.abort();
+  }, [authOpen, mode]);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (request.current) return;
+    const controller = new AbortController();
+    request.current = controller;
     setBusy(true);
+    setConnecting(true);
+    setWaking(false);
     setError("");
     try {
+      await prepareAuth(controller.signal, () => setWaking(true));
+      controller.signal.throwIfAborted();
+      setConnecting(false);
+      const signal = AbortSignal.any([
+        controller.signal,
+        AbortSignal.timeout(30000),
+      ]);
       if (mode === "forgot") {
         await api("/auth/password-reset/", {
           method: "POST",
+          signal,
           body: JSON.stringify({ email }),
         });
         setSent(true);
       } else if (mode === "reset") {
         await api("/auth/reset-confirm/", {
           method: "POST",
+          signal,
           body: JSON.stringify({
             uid,
             uidb64: uid,
@@ -60,6 +85,7 @@ export function AuthDialog() {
       } else if (mode === "verify") {
         await api("/auth/verify-email/", {
           method: "POST",
+          signal,
           body: JSON.stringify({ uid, token }),
         });
         notify("Your email is verified.");
@@ -69,6 +95,7 @@ export function AuthDialog() {
       } else {
         await api(`/auth/${mode}/`, {
           method: "POST",
+          signal,
           body: JSON.stringify({
             email,
             password,
@@ -88,9 +115,15 @@ export function AuthDialog() {
         );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Please try again.");
+      if (!controller.signal.aborted)
+        setError(e instanceof Error ? e.message : "Please try again.");
     } finally {
-      setBusy(false);
+      if (request.current === controller) {
+        request.current = null;
+        setBusy(false);
+        setConnecting(false);
+        setWaking(false);
+      }
     }
   }
   const title = {
@@ -117,7 +150,7 @@ export function AuthDialog() {
                 : "Confirm your email to complete your account."
       }
     >
-      <form className="auth-form" onSubmit={submit}>
+      <form className="auth-form" onSubmit={submit} aria-busy={busy}>
         {sent ? (
           <div className="auth-sent">
             <Mail size={28} />
@@ -179,9 +212,19 @@ export function AuthDialog() {
                 {error}
               </p>
             )}
+            {connecting && (
+              <p role="status" className="auth-connection-status">
+                {waking
+                  ? "Sesh is connecting. After a quiet spell, this can take about a minute. We’ll continue automatically—no need to submit again."
+                  : "Connecting to your space…"}
+              </p>
+            )}
             <Button className="w-full" disabled={busy} type="submit">
               {busy ? (
-                <Loader2 size={17} className="spin" />
+                <>
+                  <Loader2 size={17} className="spin" />
+                  {connecting ? "Connecting…" : "Please wait…"}
+                </>
               ) : mode === "register" ? (
                 "Create your space"
               ) : mode === "login" ? (

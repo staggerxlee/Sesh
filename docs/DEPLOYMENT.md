@@ -116,6 +116,8 @@ Keep Git integration and auto-deploy enabled for `main` on both hosts. Push test
 
 Render Free sleeps after 15 idle minutes and can take about a minute to wake. If the app initially reports a connection error, open the backend `/health/` URL, wait for it to respond, then reload Sesh. Active study heartbeats normally keep the backend busy, but outages can still trigger Sesh's conservative recovery flow. Free hosting is not an uptime guarantee.
 
+Account forms now perform a bounded startup check before submitting: safe CSRF GET requests retry for up to 90 seconds, with a visible connection message. Closing the dialog cancels the wait. Login, registration and other account mutations are not automatically replayed after network failures. This improves first-use startup on the free plan; it does not prevent Render from sleeping. The owner chose to keep hosting free on November 18, 2026.
+
 Neon is used because Render's free PostgreSQL expires after 30 days. Sesh stores personal cover images in PostgreSQL, so they survive Render's temporary filesystem but count against database storage. Monitor free-plan quotas and keep exports/backups.
 
 ## Troubleshooting

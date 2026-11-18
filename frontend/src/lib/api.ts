@@ -8,13 +8,15 @@ export class ApiError extends Error {
   }
 }
 let csrfToken = "";
-export async function csrf() {
+export async function csrf(signal?: AbortSignal) {
   let response: Response;
   try {
     response = await fetch("/api/v1/auth/csrf/", {
       credentials: "include",
       cache: "no-store",
-      signal: AbortSignal.timeout(10000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(10000)])
+        : AbortSignal.timeout(10000),
     });
   } catch {
     throw new ApiError(
@@ -29,9 +31,58 @@ export async function csrf() {
       response.status,
       null,
     );
-  const data = await response.json();
-  csrfToken = data.csrfToken || data.csrf_token || data.token || "";
+  const data = await response.json().catch(() => null);
+  const token = data?.csrfToken || data?.csrf_token || data?.token;
+  if (typeof token !== "string" || !token)
+    throw new ApiError(
+      "Sesh is still connecting. Please try again shortly.",
+      503,
+      null,
+    );
+  csrfToken = token;
   return csrfToken;
+}
+
+/** Wake free hosting with safe GETs before sending an account mutation once. */
+export async function prepareAuth(signal: AbortSignal, onWaiting: () => void) {
+  const deadline = AbortSignal.timeout(90000);
+  const stop = AbortSignal.any([signal, deadline]);
+  const hint = setTimeout(onWaiting, 2000);
+  try {
+    while (!stop.aborted) {
+      try {
+        await csrf(stop);
+        stop.throwIfAborted();
+        return;
+      } catch (error) {
+        if (stop.aborted) break;
+        if (
+          !(error instanceof ApiError) ||
+          ![0, 408, 502, 503, 504].includes(error.status)
+        )
+          throw error;
+        onWaiting();
+      }
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          stop.removeEventListener("abort", done);
+          resolve();
+        };
+        const timer = setTimeout(done, 2000);
+        stop.addEventListener("abort", done, { once: true });
+        if (stop.aborted) done();
+      });
+    }
+    signal.throwIfAborted();
+    throw new ApiError(
+      "Sesh is taking longer than usual to connect. Please try again shortly. Your details are still here.",
+      0,
+      null,
+    );
+  } finally {
+    clearTimeout(hint);
+  }
 }
 function errorMessage(data: unknown): string {
   if (typeof data === "string") return data;

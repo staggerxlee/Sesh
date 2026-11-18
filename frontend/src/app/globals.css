@@ -1237,6 +1237,11 @@ main#main {
   gap: 19px;
   margin-top: 27px;
 }
+.auth-connection-status {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
 .form-error {
   color: var(--danger);
   font-size: 11px;
