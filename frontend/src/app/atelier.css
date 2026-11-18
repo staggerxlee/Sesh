@@ -1332,7 +1332,7 @@ main#main {
   }
 }
 .controls-idle
-  .cinema-chrome:not(:has(:focus-visible)):not(:has(.sound-panel)):not(:hover),
+  .cinema-chrome:not(:has(:focus-visible)):not(:has(.sound-panel[data-open="true"])):not(:hover),
 .controls-idle .focus-controls:not(:has(:focus-visible)):not(:hover),
 .controls-idle .discard-button:not(:focus-visible):not(:hover),
 .controls-idle .immersive-tools:not(:has(:focus-visible)):not(:hover),

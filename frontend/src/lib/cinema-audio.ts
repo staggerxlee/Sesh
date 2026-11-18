@@ -38,7 +38,8 @@ export class RoomMix {
       old.source.stop(t + 0.62);
       this.current = null;
     }
-    if (mode === "silence") return;
+    // Lo-fi is streamed by the official SoundCloud widget, never a local loop.
+    if (mode === "silence" || mode === "lofi") return;
     let pending = this.cache.get(mode);
     if (!pending) {
       pending = fetch("/atelier/sound/" + mode + ".wav")

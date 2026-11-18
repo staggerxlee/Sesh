@@ -16,6 +16,7 @@ import { useSesh } from "@/lib/store";
 import { RoomMix, type Sound } from "@/lib/cinema-audio";
 import type { PianistState } from "@/lib/pianist";
 import { RoomDay, type AtmosphereMode } from "@/lib/room-day";
+import { SoundCloudLofi } from "./soundcloud-lofi";
 const World = dynamic(() => import("./atelier-world"), { ssr: false });
 class Guard extends Component<
   { children: ReactNode; failed: () => void },
@@ -121,9 +122,9 @@ export function RoomStage({
   useEffect(() => {
     let attached = true;
     mix.current
-      ?.select(audible)
+      ?.select(audible === "lofi" ? "silence" : audible)
       .then(() => {
-        if (attached)
+        if (attached && audible !== "lofi")
           setOutput(
             mix.current?.ctx.state === "running"
               ? mix.current?.current?.mode || "silence"
@@ -141,18 +142,28 @@ export function RoomStage({
   }, [audible]);
   async function select(value: Sound) {
     try {
-      if (value !== "silence") {
+      if (value !== "silence" && value !== "lofi") {
         mix.current ??= new RoomMix();
         await mix.current.unlock();
         mix.current.volume(vol);
       }
       setSound(value);
+      setOutput("silence");
+      if (value === "lofi") {
+        setPanel(true);
+      }
       setHold(false);
       setError("");
     } catch {
       setError("Audio playback is unavailable in this browser.");
     }
   }
+  const onLofiPlayback = useCallback(
+    (isPlaying: boolean) => {
+      if (sound === "lofi") setOutput(isPlaying ? "lofi" : "silence");
+    },
+    [sound],
+  );
   const selectRef = useRef(select);
   selectRef.current = select;
   useEffect(() => {
@@ -223,8 +234,7 @@ export function RoomStage({
       <div className="cinema-veil" />
       {!home && (
         <div className="cinema-id">
-          S / 01 &nbsp;{" "}
-          SHRI’S LITTLE CORNER{" "}
+          S / 01 &nbsp; SHRI’S LITTLE CORNER{" "}
           <span>
             {quiet
               ? "MINIMAL"
@@ -236,122 +246,127 @@ export function RoomStage({
           </span>
         </div>
       )}
-      {!home && !complete && (
-        <>
-          <button className="leave-cinema cinema-chrome" onClick={onLeave}>
-            <ArrowLeft size={15} />
-            {mode === "focus" ? "Leave · timer stays on" : "Leave room"}
-          </button>
-          <div className="cinema-dock cinema-chrome">
-            {panel && (
-              <div className="sound-panel">
-                <span className="index-label">SOUND ENVIRONMENT</span>
-                <label>
-                    Atmosphere
-                    <select
-                      aria-label="Room atmosphere"
-                      value={atmosphere}
-                      onChange={(e) => {
-                        const mode = e.target.value as AtmosphereMode;
-                        day.setMode(mode);
-                        setAtmosphere(mode);
-                      }}
-                    >
-                      <option value="cycle">One-hour day cycle</option>
-                      <option value="local">Match local time</option>
-                      <option value="hold">Stay in current atmosphere</option>
-                    </select>
-                </label>
-                <div className="sound-list">
-                  {salonEditions.map(({ sound: v, title }) => (
-                    <button
-                      key={v}
-                      aria-label={
-                        v === "lofi" ? "Lo-fi" : v[0].toUpperCase() + v.slice(1)
-                      }
-                      aria-pressed={v === sound}
-                      onClick={() => void select(v)}
-                    >
-                      <img src={`/atelier/editions/${v}.webp`} alt="" />
-                      <span>{title}</span>
-                      {v === "lofi" ? "Lo-fi" : v[0].toUpperCase() + v.slice(1)}
-                    </button>
-                  ))}
-                </div>
-                <label>
-                  Volume
-                  <input
-                    aria-label="Sound volume"
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={vol}
-                    onChange={(e) => setVol(+e.target.value)}
-                  />
-                </label>
-                <div>
-                  <button
-                    aria-pressed={effects}
-                    onClick={() => setEffects(!effects)}
-                  >
-                    Atmosphere {effects ? "on" : "off"}
-                  </button>
-                  <button
-                    aria-pressed={moving}
-                    disabled={sys || preferences.reduced_motion}
-                    onClick={() => {
-                      setStill(!still);
-                      localStorage.setItem(
-                        "sesh-room-still",
-                        still ? "0" : "1",
-                      );
-                    }}
-                  >
-                    Motion {moving ? "on" : "off"}
-                  </button>
-                </div>
-                {error && <p role="alert">{error}</p>}
-                {failed && (
-                  <button
-                    onClick={() => {
-                      setReady(false);
-                      setFailed(false);
-                    }}
-                  >
-                    Static plate · Retry 3D ↗
-                  </button>
-                )}
-              </div>
-            )}
-            <div className="dock-row">
-              <button onClick={() => setPanel(!panel)} aria-expanded={panel}>
-                <Volume2 size={16} />
-                {sound === "lofi" ? "Lo-fi" : sound}
-              </button>
-              {sound !== "silence" && (
-                <button
-                  disabled={paused}
-                  onClick={() => setHold(!hold)}
-                  aria-label={hold ? "Resume sound" : "Pause sound"}
-                >
-                  {hold ? <Play size={14} /> : <Pause size={14} />}
-                </button>
-              )}
-              <button
-                aria-pressed={quiet}
-                onClick={() => {
-                  setQuiet(!quiet);
-                  localStorage.setItem("sesh-room-quiet", quiet ? "0" : "1");
+      <div style={{ display: home || complete ? "none" : undefined }}>
+        <button className="leave-cinema cinema-chrome" onClick={onLeave}>
+          <ArrowLeft size={15} />
+          {mode === "focus" ? "Leave · timer stays on" : "Leave room"}
+        </button>
+        <div className="cinema-dock cinema-chrome">
+          <div
+            className="sound-panel"
+            data-open={panel}
+            style={{ display: panel ? undefined : "none" }}
+          >
+            <span className="index-label">SOUND ENVIRONMENT</span>
+            <label>
+              Atmosphere
+              <select
+                aria-label="Room atmosphere"
+                value={atmosphere}
+                onChange={(e) => {
+                  const mode = e.target.value as AtmosphereMode;
+                  day.setMode(mode);
+                  setAtmosphere(mode);
                 }}
               >
-                {quiet ? <EyeOff size={15} /> : <Eye size={15} />}{" "}
-                {quiet ? "Show room" : "Minimal"}
+                <option value="cycle">One-hour day cycle</option>
+                <option value="local">Match local time</option>
+                <option value="hold">Stay in current atmosphere</option>
+              </select>
+            </label>
+            <div className="sound-list">
+              {salonEditions.map(({ sound: v, title }) => (
+                <button
+                  key={v}
+                  aria-label={
+                    v === "lofi" ? "Lo-fi" : v[0].toUpperCase() + v.slice(1)
+                  }
+                  aria-pressed={v === sound}
+                  onClick={() => void select(v)}
+                >
+                  <img src={`/atelier/editions/${v}.webp`} alt="" />
+                  <span>{title}</span>
+                  {v === "lofi" ? "Lo-fi" : v[0].toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+            <SoundCloudLofi
+              selected={sound === "lofi"}
+              playing={audible === "lofi"}
+              canPlay={(!home || backgroundSession) && !paused && !complete}
+              volume={vol}
+              onPlayback={onLofiPlayback}
+              onHold={setHold}
+            />
+            <label>
+              Volume
+              <input
+                aria-label="Sound volume"
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={vol}
+                onChange={(e) => setVol(+e.target.value)}
+              />
+            </label>
+            <div>
+              <button
+                aria-pressed={effects}
+                onClick={() => setEffects(!effects)}
+              >
+                Atmosphere {effects ? "on" : "off"}
+              </button>
+              <button
+                aria-pressed={moving}
+                disabled={sys || preferences.reduced_motion}
+                onClick={() => {
+                  setStill(!still);
+                  localStorage.setItem("sesh-room-still", still ? "0" : "1");
+                }}
+              >
+                Motion {moving ? "on" : "off"}
               </button>
             </div>
+            {error && <p role="alert">{error}</p>}
+            {failed && (
+              <button
+                onClick={() => {
+                  setReady(false);
+                  setFailed(false);
+                }}
+              >
+                Static plate · Retry 3D ↗
+              </button>
+            )}
           </div>
-        </>
-      )}
+          <div className="dock-row">
+            <button onClick={() => setPanel(!panel)} aria-expanded={panel}>
+              <Volume2 size={16} />
+              {sound === "lofi" ? "Lo-fi" : sound}
+            </button>
+            {sound !== "silence" && (
+              <button
+                disabled={paused}
+                onClick={() => setHold(!hold)}
+                aria-label={hold ? "Resume sound" : "Pause sound"}
+              >
+                {hold ? <Play size={14} /> : <Pause size={14} />}
+              </button>
+            )}
+            <button
+              aria-pressed={quiet}
+              onClick={() => {
+                setQuiet(!quiet);
+                localStorage.setItem("sesh-room-quiet", quiet ? "0" : "1");
+              }}
+            >
+              {quiet ? <EyeOff size={15} /> : <Eye size={15} />}{" "}
+              {quiet ? "Show room" : "Minimal"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

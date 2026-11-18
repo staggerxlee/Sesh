@@ -533,6 +533,27 @@ body:has(.cinema-host) {
 .sound-panel {
   border-radius: 8px;
   width: min(400px, 90vw);
+  max-height: calc(100dvh - 120px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.soundcloud-lofi {
+  margin-block: 14px;
+}
+.soundcloud-lofi > a {
+  display: block;
+  margin-bottom: 10px;
+  color: #ecd3af;
+  font: 11px/1.5 var(--sans);
+}
+.soundcloud-lofi iframe {
+  display: block;
+  border: 0;
+  border-radius: 4px;
+}
+.soundcloud-lofi > p {
+  margin-top: 8px;
+  line-height: 1.5;
 }
 .sound-panel .sound-list {
   display: grid;
