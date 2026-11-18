@@ -1,4 +1,5 @@
 from datetime import timedelta
+import zoneinfo
 
 from django.contrib.auth import get_user_model
 from django.core import mail, signing
@@ -47,6 +48,25 @@ class AuthTests(TestCase):
         self.csrf()
         self.assertEqual(self.client.post('/api/v1/auth/login/', {'email': 'PERSON@Example.com', 'password': 'wrong'}, format='json').status_code, 401)
         self.assertEqual(self.client.post('/api/v1/auth/login/', {'email': 'PERSON@Example.com', 'password': 'calm-study-phrase-138'}, format='json').status_code, 200)
+
+    def test_registration_accepts_browser_timezone_aliases_without_system_tzdata(self):
+        original_path = zoneinfo.TZPATH
+        zoneinfo.reset_tzpath(())
+        zoneinfo.ZoneInfo.clear_cache()
+        try:
+            for index, zone in enumerate(['Asia/Katmandu', 'Asia/Kathmandu', 'Asia/Calcutta', 'America/New_York', 'UTC']):
+                with self.subTest(timezone=zone):
+                    self.csrf()
+                    result = self.client.post('/api/v1/auth/register/', {
+                        'email': f'timezone-{index}@example.com',
+                        'password': 'calm-study-phrase-138', 'timezone': zone,
+                    }, format='json')
+                    self.assertEqual(result.status_code, 201, result.data)
+                    self.assertEqual(result.data['preferences']['timezone'], zone)
+                    self.assertEqual(self.client.get('/api/v1/auth/me/').data['preferences']['timezone'], zone)
+        finally:
+            zoneinfo.reset_tzpath(original_path)
+            zoneinfo.ZoneInfo.clear_cache()
 
     @override_settings(EMAIL_BACKEND='study.email_backend.BrevoEmailBackend', BREVO_API_KEY='')
     def test_accounts_work_without_email_and_reset_reports_unavailability_privately(self):
