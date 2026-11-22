@@ -67,3 +67,81 @@
     display: none;
   }
 }
+
+.duration-field {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.duration-field legend {
+  margin-bottom: 9px;
+  font-size: 13px;
+}
+.duration-parts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.duration-parts label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.duration-parts input {
+  width: 100%;
+  min-width: 0;
+}
+.duration-parts span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.youtube-music {
+  position: fixed;
+  z-index: 45;
+  right: 4vw;
+  bottom: calc(4vh + 54px);
+  width: min(360px, calc(100vw - 48px));
+  padding: 12px;
+  background: #15130fed;
+  border: 1px solid #f0d9b526;
+  border-radius: 10px;
+  color: #eadcca;
+  pointer-events: auto;
+}
+.youtube-music > a {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.youtube-music iframe {
+  width: 100%;
+  height: 210px;
+  border: 0;
+  display: block;
+}
+.youtube-music p {
+  font-size: 11px;
+  margin-top: 8px;
+}
+.sound-panel {
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+}
+@media (max-width: 600px) {
+  .youtube-music {
+    right: 16px;
+    bottom: 72px;
+    width: min(320px, calc(100vw - 24px));
+  }
+}
+
+.video-dock .sound-panel {
+  margin-bottom: 285px;
+  max-height: max(150px, calc(100dvh - 440px));
+}
+.sound-panel .sound-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}

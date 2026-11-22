@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
+  distDir: process.env.SESH_QA_DIST_DIR || ".next",
   poweredByHeader: false,
   skipTrailingSlashRedirect: true,
   async rewrites() {

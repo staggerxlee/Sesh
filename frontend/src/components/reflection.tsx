@@ -1,4 +1,5 @@
 "use client";
+import { DurationField } from "./duration-field";
 
 import {
   useEffect,
@@ -324,7 +325,7 @@ export function SubjectsPage() {
     }
     const target = Number(goal) || 0;
     if (target < 0 || target > 10080) {
-      setError("Choose a weekly target between 0 and 10,080 minutes.");
+      setError("Choose a weekly target between 0 and 168 hours.");
       return;
     }
     setSaving(true);
@@ -623,19 +624,14 @@ export function SubjectsPage() {
               )}
             />
           </div>
-          <label className="field">
-            Weekly target <span className="r-meta">Optional, in minutes</span>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              max={10080}
-              step={5}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="No target"
-            />
-          </label>
+          <DurationField
+            label="Weekly target"
+            value={Number(goal) || 0}
+            onChange={(v) => setGoal(String(v))}
+            min={0}
+            max={10080}
+            optional
+          />
           <ErrorNote message={error} />
           <div className="r-form-actions">
             <Button
@@ -821,9 +817,7 @@ export function SessionEditor({
       return;
     }
     if (!Number.isFinite(value) || value <= 0 || value > 1440) {
-      setError(
-        "Enter a duration greater than 0 and no more than 1,440 minutes.",
-      );
+      setError("Enter a duration greater than 0 and no more than 24 hours.");
       return;
     }
     setSaving(true);
@@ -957,19 +951,15 @@ export function SessionEditor({
             required
           />
         </label>
-        <label className="field">
-          Focused time <span className="r-meta">Minutes, excluding breaks</span>
-          <input
-            className="input"
-            type="number"
-            step="0.01"
-            min="0.01"
-            max="1440"
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            required
-          />
-        </label>
+        <DurationField
+          label="Focused time"
+          value={Number(minutes) || 0}
+          onChange={(v) => setMinutes(String(v))}
+          min={0.01}
+          max={1440}
+          fractional
+        />
+        <small className="r-meta">Excluding breaks</small>
         <label className="field">
           Session note <span className="r-meta">Optional</span>
           <textarea
@@ -2130,7 +2120,7 @@ export function SettingsPage({
       draft.weekly_goal_minutes > 10080
     ) {
       setError(
-        "Daily goals must be 1–1,440 minutes and weekly goals 1–10,080 minutes.",
+        "Goals must be at least 1 minute, up to 24 hours daily or 168 hours weekly.",
       );
       return;
     }
@@ -2147,7 +2137,7 @@ export function SettingsPage({
       draft.long_break > 120
     ) {
       setError(
-        "Choose whole minutes: 1–1,440 for countdown, 1–180 for focus, 1–60 for short breaks, and 1–120 for long breaks.",
+        "Use whole hours and minutes: up to 24 hours for countdown, 3 hours for focus, 1 hour for short breaks, and 2 hours for long breaks. Each duration must be at least 1 minute.",
       );
       return;
     }
@@ -2313,34 +2303,18 @@ export function SettingsPage({
             </div>
             <div className="r-setting-fields">
               <div className="form-grid">
-                <label className="field">
-                  Daily target <span className="r-meta">Minutes</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={draft.daily_goal_minutes}
-                    onChange={(e) =>
-                      update("daily_goal_minutes", Number(e.target.value))
-                    }
-                    required
-                  />
-                </label>
-                <label className="field">
-                  Weekly target <span className="r-meta">Minutes</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={10080}
-                    value={draft.weekly_goal_minutes}
-                    onChange={(e) =>
-                      update("weekly_goal_minutes", Number(e.target.value))
-                    }
-                    required
-                  />
-                </label>
+                <DurationField
+                  label="Daily target"
+                  value={draft.daily_goal_minutes}
+                  onChange={(v) => update("daily_goal_minutes", v)}
+                  max={1440}
+                />
+                <DurationField
+                  label="Weekly target"
+                  value={draft.weekly_goal_minutes}
+                  onChange={(v) => update("weekly_goal_minutes", v)}
+                  max={10080}
+                />
               </div>
               <fieldset className="r-rest-field">
                 <legend>Preferred rest days</legend>
@@ -2395,70 +2369,32 @@ export function SettingsPage({
                     <option value="pomodoro">Pomodoro</option>
                   </select>
                 </label>
-                <label className="field">
-                  Countdown duration <span className="r-meta">Minutes</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={draft.default_duration}
-                    onChange={(e) =>
-                      update("default_duration", Number(e.target.value))
-                    }
-                    required
-                  />
-                </label>
+                <DurationField
+                  label="Countdown duration"
+                  value={draft.default_duration}
+                  onChange={(v) => update("default_duration", v)}
+                  max={1440}
+                />
               </div>
               <div className="r-three-fields">
-                <label className="field">
-                  Pomodoro focus
-                  <input
-                    className="input"
-                    aria-label="Pomodoro focus minutes"
-                    type="number"
-                    min={1}
-                    max={180}
-                    value={draft.pomodoro_focus}
-                    onChange={(e) =>
-                      update("pomodoro_focus", Number(e.target.value))
-                    }
-                    required
-                  />
-                  <small>minutes</small>
-                </label>
-                <label className="field">
-                  Short break
-                  <input
-                    className="input"
-                    aria-label="Short break minutes"
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={draft.short_break}
-                    onChange={(e) =>
-                      update("short_break", Number(e.target.value))
-                    }
-                    required
-                  />
-                  <small>minutes</small>
-                </label>
-                <label className="field">
-                  Long break
-                  <input
-                    className="input"
-                    aria-label="Long break minutes"
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={draft.long_break}
-                    onChange={(e) =>
-                      update("long_break", Number(e.target.value))
-                    }
-                    required
-                  />
-                  <small>minutes</small>
-                </label>
+                <DurationField
+                  label="Pomodoro focus"
+                  value={draft.pomodoro_focus}
+                  onChange={(v) => update("pomodoro_focus", v)}
+                  max={180}
+                />
+                <DurationField
+                  label="Short break"
+                  value={draft.short_break}
+                  onChange={(v) => update("short_break", v)}
+                  max={60}
+                />
+                <DurationField
+                  label="Long break"
+                  value={draft.long_break}
+                  onChange={(v) => update("long_break", v)}
+                  max={120}
+                />
               </div>
               <label className="r-toggle">
                 <span>

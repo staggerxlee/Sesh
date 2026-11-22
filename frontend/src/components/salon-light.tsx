@@ -11,6 +11,9 @@ const grades: Record<Sound, string> = {
   silence: "#f6d7c1",
   rain: "#91adc7",
   lofi: "#bb8a95",
+  ocean: "#c4dce3",
+  brown: "#dac4a8",
+  hertz: "#e3d5c7",
 };
 export function SalonSky({
   sound,

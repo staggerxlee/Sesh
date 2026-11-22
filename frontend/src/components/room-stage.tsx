@@ -1,4 +1,6 @@
 "use client";
+import { isYouTubeSound, youtubeTracks } from "@/lib/youtube";
+import { YouTubeMusic } from "./youtube-music";
 import dynamic from "next/dynamic";
 import {
   Component,
@@ -122,9 +124,11 @@ export function RoomStage({
   useEffect(() => {
     let attached = true;
     mix.current
-      ?.select(audible === "lofi" ? "silence" : audible)
+      ?.select(
+        audible === "lofi" || isYouTubeSound(audible) ? "silence" : audible,
+      )
       .then(() => {
-        if (attached && audible !== "lofi")
+        if (attached && audible !== "lofi" && !isYouTubeSound(audible))
           setOutput(
             mix.current?.ctx.state === "running"
               ? mix.current?.current?.mode || "silence"
@@ -142,14 +146,14 @@ export function RoomStage({
   }, [audible]);
   async function select(value: Sound) {
     try {
-      if (value !== "silence" && value !== "lofi") {
+      if (value !== "silence" && value !== "lofi" && !isYouTubeSound(value)) {
         mix.current ??= new RoomMix();
         await mix.current.unlock();
         mix.current.volume(vol);
       }
       setSound(value);
       setOutput("silence");
-      if (value === "lofi") {
+      if (value === "lofi" || isYouTubeSound(value)) {
         setPanel(true);
       }
       setHold(false);
@@ -161,6 +165,12 @@ export function RoomStage({
   const onLofiPlayback = useCallback(
     (isPlaying: boolean) => {
       if (sound === "lofi") setOutput(isPlaying ? "lofi" : "silence");
+    },
+    [sound],
+  );
+  const onVideoPlayback = useCallback(
+    (playing: boolean) => {
+      if (isYouTubeSound(sound)) setOutput(playing ? sound : "silence");
     },
     [sound],
   );
@@ -232,6 +242,17 @@ export function RoomStage({
         </>
       )}
       <div className="cinema-veil" />
+      {isYouTubeSound(sound) && (!home || backgroundSession) && !complete && (
+        <YouTubeMusic
+          key={sound}
+          sound={sound}
+          playing={audible === sound}
+          canPlay={!paused && !complete}
+          volume={vol}
+          onPlayback={onVideoPlayback}
+          onHold={setHold}
+        />
+      )}
       {!home && (
         <div className="cinema-id">
           S / 01 &nbsp; SHRI’S LITTLE CORNER{" "}
@@ -251,7 +272,9 @@ export function RoomStage({
           <ArrowLeft size={15} />
           {mode === "focus" ? "Leave · timer stays on" : "Leave room"}
         </button>
-        <div className="cinema-dock cinema-chrome">
+        <div
+          className={`cinema-dock cinema-chrome ${isYouTubeSound(sound) ? "video-dock" : ""}`}
+        >
           <div
             className="sound-panel"
             data-open={panel}
@@ -279,14 +302,24 @@ export function RoomStage({
                 <button
                   key={v}
                   aria-label={
-                    v === "lofi" ? "Lo-fi" : v[0].toUpperCase() + v.slice(1)
+                    isYouTubeSound(v)
+                      ? youtubeTracks[v].label
+                      : v === "lofi"
+                        ? "Lo-fi"
+                        : v[0].toUpperCase() + v.slice(1)
                   }
                   aria-pressed={v === sound}
                   onClick={() => void select(v)}
                 >
-                  <img src={`/atelier/editions/${v}.webp`} alt="" />
+                  {!isYouTubeSound(v) && (
+                    <img src={`/atelier/editions/${v}.webp`} alt="" />
+                  )}
                   <span>{title}</span>
-                  {v === "lofi" ? "Lo-fi" : v[0].toUpperCase() + v.slice(1)}
+                  {isYouTubeSound(v)
+                    ? youtubeTracks[v].label
+                    : v === "lofi"
+                      ? "Lo-fi"
+                      : v[0].toUpperCase() + v.slice(1)}
                 </button>
               ))}
             </div>
@@ -343,7 +376,11 @@ export function RoomStage({
           <div className="dock-row">
             <button onClick={() => setPanel(!panel)} aria-expanded={panel}>
               <Volume2 size={16} />
-              {sound === "lofi" ? "Lo-fi" : sound}
+              {isYouTubeSound(sound)
+                ? youtubeTracks[sound].label
+                : sound === "lofi"
+                  ? "Lo-fi"
+                  : sound}
             </button>
             {sound !== "silence" && (
               <button
