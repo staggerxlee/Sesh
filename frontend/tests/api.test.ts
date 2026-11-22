@@ -1,6 +1,82 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { api, ApiError, clearCsrf, prepareAuth } from "../src/lib/api";
+test("page reads recover from a sleeping server and an HTML proxy response", async () => {
+  const original = globalThis.fetch;
+  let calls = 0,
+    waiting = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) return new Response("Waking", { status: 503 });
+    if (calls === 2) return new Response("<html>Starting</html>");
+    return Response.json({ user: { id: 7 }, preferences: {} });
+  };
+  try {
+    assert.deepEqual(await api("/auth/me/", { onRetry: () => waiting++ }), {
+      user: { id: 7 },
+      preferences: {},
+    });
+    assert.equal(calls, 3);
+    assert.equal(waiting, 2);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+test("a dropped page read recovers without user intervention", async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    if (++calls === 1) throw new TypeError("Failed to fetch");
+    return Response.json([{ id: 12 }]);
+  };
+  try {
+    assert.deepEqual(await api("/subjects/"), [{ id: 12 }]);
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+test("unauthenticated reads stop immediately and empty active sessions remain valid", async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return Response.json({ detail: "Not authenticated" }, { status: 401 });
+  };
+  try {
+    await assert.rejects(
+      () => api("/auth/me/"),
+      (e) => e instanceof ApiError && e.status === 401,
+    );
+    assert.equal(calls, 1);
+    globalThis.fetch = async () => new Response("");
+    assert.equal(await api("/sessions/active/"), null);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+test("cancelling a page refresh stops retries immediately", async () => {
+  const original = globalThis.fetch;
+  const controller = new AbortController();
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response("Waking", { status: 502 });
+  };
+  try {
+    await assert.rejects(
+      () =>
+        api("/auth/me/", {
+          signal: controller.signal,
+          onRetry: () => controller.abort(),
+        }),
+      { name: "AbortError" },
+    );
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
 test("an offline CSRF bootstrap is classified as a recoverable connection failure", async () => {
   const original = globalThis.fetch;
   clearCsrf();

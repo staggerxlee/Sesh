@@ -99,7 +99,63 @@ function errorMessage(data: unknown): string {
   }
   return "Something went wrong. Please try again.";
 }
+export interface ApiOptions extends RequestInit {
+  onRetry?: () => void;
+}
+export function isTemporaryApiError(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError &&
+    [0, 408, 500, 502, 503, 504].includes(error.status)
+  );
+}
+
+// All application reads share recovery, not just the sign-in form. Writes are
+// never replayed after ambiguous failures: the server may already have saved them.
 export async function api<T = unknown>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<T> {
+  const { onRetry, ...requestOptions } = options;
+  const method = (options.method || "GET").toUpperCase();
+  if (method !== "GET") return request<T>(path, requestOptions);
+  const deadline = AbortSignal.timeout(90000);
+  const stop = options.signal
+    ? AbortSignal.any([options.signal, deadline])
+    : deadline;
+  let attempt = 0;
+  let lastError: unknown;
+  while (!stop.aborted) {
+    try {
+      return await request<T>(path, {
+        ...requestOptions,
+        signal: AbortSignal.any([stop, AbortSignal.timeout(10000)]),
+      });
+    } catch (error) {
+      lastError = error;
+      if (stop.aborted) break;
+      if (!isTemporaryApiError(error)) throw error;
+      onRetry?.();
+    }
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        stop.removeEventListener("abort", done);
+        resolve();
+      };
+      const timer = setTimeout(done, Math.min(1000 * 2 ** attempt++, 8000));
+      stop.addEventListener("abort", done, { once: true });
+      if (stop.aborted) done();
+    });
+  }
+  options.signal?.throwIfAborted();
+  throw new ApiError(
+    "Your connection to Sesh is taking longer than usual. We’ll reconnect automatically.",
+    lastError instanceof ApiError ? lastError.status : 0,
+    null,
+  );
+}
+
+async function request<T = unknown>(
   path: string,
   options: RequestInit = {},
   retriedCsrf = false,
@@ -131,7 +187,19 @@ export async function api<T = unknown>(
     );
   }
   if (response.status === 204) return undefined as T;
-  const data = await response.json().catch(() => null);
+  let raw: string;
+  try {
+    raw = await response.text();
+  } catch {
+    throw new ApiError("The connection was interrupted.", 0, null);
+  }
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    // A waking proxy can return an HTML loading page with status 200.
+    if (response.ok) throw new ApiError("Sesh is reconnecting.", 503, null);
+  }
   if (
     response.status === 403 &&
     !retriedCsrf &&
@@ -139,10 +207,16 @@ export async function api<T = unknown>(
   ) {
     clearCsrf();
     await csrf();
-    return api<T>(path, options, true);
+    return request<T>(path, options, true);
   }
   if (!response.ok)
-    throw new ApiError(errorMessage(data), response.status, data);
+    throw new ApiError(
+      response.status >= 500
+        ? "Sesh is temporarily unavailable. Reconnecting…"
+        : errorMessage(data),
+      response.status,
+      data,
+    );
   if (
     data &&
     typeof data === "object" &&

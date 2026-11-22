@@ -9,6 +9,11 @@
 .shri-name:focus-visible {
   color: #e6c5b9;
 }
+.personal-mast h1 .shri-title-name,
+.personal-mast h1 .shri-name {
+  display: inline-block;
+  white-space: nowrap;
+}
 .shri-hearts {
   position: absolute;
   inset: 0;

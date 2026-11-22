@@ -118,11 +118,14 @@ export function PersonalHero({
         )}
         <div className="mast-copy">
           <div className="index-label">
-            <span className="signal" /> SESH &nbsp; / &nbsp;{" "}
-            SHRI’S LITTLE CORNER
+            <span className="signal" /> SESH &nbsp; / &nbsp; SHRI’S LITTLE
+            CORNER
           </div>
           <h1 className="shri-room-title">
-            <ShriName />’s
+            <span className="shri-title-name">
+              <ShriName />
+              ’s
+            </span>
             <br />
             Study Room.
           </h1>

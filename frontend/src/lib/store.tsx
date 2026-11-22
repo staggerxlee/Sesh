@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError, isTemporaryApiError } from "./api";
 import { isOlderSnapshot } from "./timer";
 import type {
   User,
@@ -43,6 +43,7 @@ interface SeshStore {
   active: StudySession | null;
   loading: boolean;
   connectionError: string;
+  reconnecting: boolean;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
   openAuth: () => void;
@@ -64,8 +65,15 @@ export function SeshProvider({ children }: { children: React.ReactNode }) {
     [active, setActiveState] = useState<StudySession | null>(null),
     [loading, setLoading] = useState(true),
     [connectionError, setConnectionError] = useState(""),
+    [reconnecting, setReconnecting] = useState(false),
     [authOpen, setAuthOpen] = useState(false),
     [toast, setToast] = useState("");
+  const refreshRequest = useRef<AbortController | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const owner = useRef<number | null>(null);
+  const coverGeneration = useRef(0);
   const refreshGeneration = useRef(0),
     timerGeneration = useRef(0);
   const notify = useCallback((message: string) => setToast(message), []);
@@ -95,61 +103,125 @@ export function SeshProvider({ children }: { children: React.ReactNode }) {
     },
     [applyActive],
   );
-  const refresh = useCallback(async () => {
-    const generation = ++refreshGeneration.current,
-      timerVersion = timerGeneration.current;
-    try {
-      const me = await api<{ user: User; preferences: Preferences }>(
-        "/auth/me/",
-      );
-      const result = await Promise.all([
-        api<Subject[]>("/subjects/"),
-        api<Topic[]>("/topics/"),
-        api<StudySession[]>("/sessions/"),
-        api<Analytics>("/analytics/"),
-        api<StudySession | null>("/sessions/active/"),
-      ]);
-      if (generation !== refreshGeneration.current) return;
-      setUser(me.user);
-      setPreferences({ ...defaultPreferences, ...me.preferences });
-      setSubjects(result[0]);
-      setTopics(result[1]);
-      setSessions(result[2]);
-      setStats(result[3]);
-      if (timerVersion === timerGeneration.current)
-        applyActive(result[4], true);
-      setConnectionError("");
-    } catch (error) {
-      if (generation !== refreshGeneration.current) return;
-      if (
-        error instanceof ApiError &&
-        (error.status === 401 || error.status === 403)
-      ) {
-        setUser(null);
-        setPreferences(defaultPreferences);
-        setSubjects([]);
-        setTopics([]);
-        setSessions([]);
-        setStats(null);
-        latestActive.current = null;
-        setActiveState(null);
-        setConnectionError("");
-      } else
-        setConnectionError(
-          error instanceof Error ? error.message : "Unable to connect to Sesh.",
+  const refresh = useCallback(
+    async function refreshData() {
+      clearTimeout(retryTimer.current);
+      refreshRequest.current?.abort();
+      const controller = new AbortController();
+      refreshRequest.current = controller;
+      const generation = ++refreshGeneration.current,
+        timerVersion = timerGeneration.current,
+        coverVersion = coverGeneration.current;
+      const current = () =>
+        generation === refreshGeneration.current && !controller.signal.aborted;
+      const reconnect = () => {
+        if (current()) {
+          setReconnecting(true);
+          setConnectionError("");
+        }
+      };
+      const hint = setTimeout(reconnect, 2000);
+      const options = { signal: controller.signal, onRetry: reconnect };
+      let authenticated = false;
+      let identityResolved = false;
+      try {
+        const me = await api<{ user: User; preferences: Preferences }>(
+          "/auth/me/",
+          options,
         );
-    } finally {
-      if (generation === refreshGeneration.current) setLoading(false);
-    }
-  }, [applyActive]);
+        if (!current()) return;
+        authenticated = true;
+        identityResolved = true;
+        if (owner.current !== me.user.id) {
+          setSubjects([]);
+          setTopics([]);
+          setSessions([]);
+          setStats(null);
+          latestActive.current = null;
+          setActiveState(null);
+          endedIds.current.clear();
+        }
+        owner.current = me.user.id;
+        setUser((previous) =>
+          coverVersion !== coverGeneration.current &&
+          previous?.id === me.user.id
+            ? { ...me.user, cover: previous.cover }
+            : me.user,
+        );
+        setPreferences({ ...defaultPreferences, ...me.preferences });
+        setLoading(false);
+        // A slow analytics read must not hide a working account, subjects or timer.
+        async function load<T>(path: string, apply: (value: T) => void) {
+          const value = await api<T>(path, options);
+          if (current()) apply(value);
+        }
+        const result = await Promise.allSettled([
+          load<Subject[]>("/subjects/", setSubjects),
+          load<Topic[]>("/topics/", setTopics),
+          load<StudySession[]>("/sessions/", setSessions),
+          load<Analytics>("/analytics/", setStats),
+          load<StudySession | null>("/sessions/active/", (value) => {
+            if (timerVersion === timerGeneration.current)
+              applyActive(value, true);
+          }),
+        ]);
+        if (!current()) return;
+        const failure = result.find((item) => item.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+        setConnectionError("");
+      } catch (error) {
+        if (!current()) return;
+        if (
+          !authenticated &&
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403)
+        ) {
+          identityResolved = true;
+          owner.current = null;
+          setUser(null);
+          setPreferences(defaultPreferences);
+          setSubjects([]);
+          setTopics([]);
+          setSessions([]);
+          setStats(null);
+          latestActive.current = null;
+          setActiveState(null);
+          setConnectionError("");
+        } else {
+          setConnectionError(
+            isTemporaryApiError(error)
+              ? "Still reconnecting. Your saved data hasn’t been changed. We’ll keep checking while this page is open."
+              : "Some study data could not load. Your saved data hasn’t been changed.",
+          );
+          if (isTemporaryApiError(error)) {
+            retryTimer.current = setTimeout(() => {
+              if (document.visibilityState === "visible" && navigator.onLine)
+                void refreshData();
+            }, 30000);
+          }
+        }
+      } finally {
+        clearTimeout(hint);
+        if (current()) {
+          refreshRequest.current = null;
+          if (identityResolved) setLoading(false);
+          setReconnecting(false);
+        }
+      }
+    },
+    [applyActive],
+  );
   useEffect(() => {
     void refresh();
     const refreshVisible = () => {
-      if (document.visibilityState === "visible") void refresh();
+      if (document.visibilityState === "visible" && !refreshRequest.current)
+        void refresh();
     };
     window.addEventListener("online", refreshVisible);
     document.addEventListener("visibilitychange", refreshVisible);
     return () => {
+      refreshRequest.current?.abort();
+      clearTimeout(retryTimer.current);
       window.removeEventListener("online", refreshVisible);
       document.removeEventListener("visibilitychange", refreshVisible);
     };
@@ -195,10 +267,11 @@ export function SeshProvider({ children }: { children: React.ReactNode }) {
         active,
         loading,
         connectionError,
+        reconnecting,
         refresh,
         notify,
         applyCover: (owner, cover) => {
-          refreshGeneration.current++;
+          coverGeneration.current++;
           setUser((current) =>
             current?.id === owner ? { ...current, cover } : current,
           );

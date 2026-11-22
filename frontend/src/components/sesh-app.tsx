@@ -26,6 +26,7 @@ function Shell() {
     toast,
     setToast,
     connectionError,
+    reconnecting,
     refresh,
     active,
     loading,
@@ -60,7 +61,11 @@ function Shell() {
     loading ? (
       <div className="loading-space" role="status">
         <span className="eyebrow">SETTLING IN</span>
-        <p>Getting your space ready.</p>
+        <p>
+          {reconnecting
+            ? "Connecting to your space. This can take about a minute after a quiet spell."
+            : "Getting your space ready."}
+        </p>
       </div>
     ) : page === "home" ? (
       <Home />
@@ -93,10 +98,16 @@ function Shell() {
       <FullscreenNavigation still={still} />
       <div className="app-shell" data-page={page}>
         <div className="app-main">
-          {connectionError && (
+          {(connectionError || reconnecting) && (
             <div className="connection-banner" role="status">
-              <span>{connectionError}</span>
-              <button onClick={() => void refresh()}>Try again</button>
+              <span>
+                {reconnecting
+                  ? "Reconnecting to your space. We’ll continue automatically."
+                  : connectionError}
+              </span>
+              {!reconnecting && (
+                <button onClick={() => void refresh()}>Reconnect now</button>
+              )}
             </div>
           )}
           <RouteStage page={page} still={still} render={renderPage} />
