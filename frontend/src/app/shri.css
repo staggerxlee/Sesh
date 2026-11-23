@@ -145,3 +145,110 @@
 .sound-panel .sound-list {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.sound-panel .sound-list button {
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sound-panel select {
+  min-width: 0;
+  max-width: 68%;
+}
+@media (max-width: 400px) {
+  .sound-panel .sound-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.custom-audio {
+  margin-block: 16px;
+  padding-block: 12px;
+  border-block: 1px solid #fff3dd20;
+}
+.sound-panel .custom-audio label {
+  border: 0;
+  display: block;
+}
+.custom-audio-entry {
+  display: flex;
+  gap: 6px;
+}
+.sound-panel .custom-audio-entry input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  background: #0b0c0b;
+  border: 1px solid #fff3dd30;
+  border-radius: 4px;
+  padding: 10px;
+  color: inherit;
+  font-size: 12px;
+}
+.sound-panel .custom-audio-entry button {
+  flex-shrink: 0;
+  background: #e4c7a3;
+  color: #1e1c17;
+  border-radius: 4px;
+}
+.custom-audio small {
+  display: block;
+  color: #b0a79b;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.sound-panel .custom-audio-file input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  font: 11px var(--sans);
+}
+.custom-audio-transport {
+  margin-top: 14px;
+}
+.custom-audio-transport strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  font: 12px var(--sans);
+  margin-bottom: 10px;
+}
+.sound-panel .custom-audio-transport input {
+  width: 100%;
+}
+.custom-audio-times {
+  display: flex;
+  justify-content: space-between;
+  font: 10px var(--mono);
+  color: #b0a79b;
+}
+.custom-audio-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.custom-audio button:disabled {
+  opacity: 0.4;
+}
+.custom-audio input:focus-visible,
+.custom-audio button:focus-visible {
+  outline: 2px solid #e4c7a3;
+  outline-offset: 3px;
+}
+.youtube-source-choice {
+  padding-block: 8px;
+}
+.youtube-source-choice a {
+  display: block;
+  font-size: 11px;
+  margin-top: 10px;
+  color: #e4c7a3;
+}
+.youtube-close {
+  float: right;
+  padding: 0 4px 6px 12px;
+  font-size: 20px;
+  line-height: 1;
+}

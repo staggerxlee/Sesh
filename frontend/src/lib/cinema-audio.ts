@@ -7,7 +7,8 @@ export type Sound =
   | "nature"
   | "ocean"
   | "brown"
-  | "hertz";
+  | "hertz"
+  | "custom";
 export const sounds: Sound[] = [
   "silence",
   "piano",
@@ -17,6 +18,7 @@ export const sounds: Sound[] = [
   "ocean",
   "brown",
   "hertz",
+  "custom",
 ];
 export class RoomMix {
   ctx: AudioContext;
@@ -57,7 +59,13 @@ export class RoomMix {
       this.current = null;
     }
     // Lo-fi is streamed by the official SoundCloud widget, never a local loop.
-    if (mode === "silence" || mode === "lofi" || isYouTubeSound(mode)) return;
+    if (
+      mode === "silence" ||
+      mode === "lofi" ||
+      mode === "custom" ||
+      isYouTubeSound(mode)
+    )
+      return;
     let pending = this.cache.get(mode);
     if (!pending) {
       pending = fetch("/atelier/sound/" + mode + ".wav")

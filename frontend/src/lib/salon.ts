@@ -9,6 +9,7 @@ export const salonEditions: { sound: Sound; title: string; detail: string }[] =
     { sound: "ocean", title: "Ocean music", detail: "YouTube" },
     { sound: "brown", title: "Brown noise", detail: "YouTube" },
     { sound: "hertz", title: "Study hertz", detail: "YouTube" },
+    { sound: "custom", title: "Your own sound", detail: "Audio link or file" },
     { sound: "silence", title: "Still room", detail: "Silence" },
   ];
 export function enterSalon(sound: Sound = "nature") {

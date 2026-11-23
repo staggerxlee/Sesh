@@ -12,6 +12,7 @@ export function YouTubeMusic(props: {
   playing: boolean;
   canPlay: boolean;
   volume: number;
+  onClose: () => void;
   onPlayback: (playing: boolean) => void;
   onHold: (hold: boolean) => void;
 }) {
@@ -116,6 +117,13 @@ export function YouTubeMusic(props: {
   }, [ready, props.playing, props.canPlay, props.volume]);
   return (
     <aside className="youtube-music" aria-label={`${track.label} player`}>
+      <button
+        className="youtube-close"
+        aria-label="Close video and stop playback"
+        onClick={props.onClose}
+      >
+        ×
+      </button>
       <a
         href={`https://www.youtube.com/watch?v=${track.id}${track.start ? `&t=${track.start}s` : ""}`}
         target="_blank"

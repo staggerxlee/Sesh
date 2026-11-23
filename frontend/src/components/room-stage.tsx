@@ -1,5 +1,6 @@
 "use client";
 import { isYouTubeSound, youtubeTracks } from "@/lib/youtube";
+import { CustomAudio } from "./custom-audio";
 import { YouTubeMusic } from "./youtube-music";
 import dynamic from "next/dynamic";
 import {
@@ -53,6 +54,7 @@ export function RoomStage({
     () => new RoomDay(preferences.timezone),
     [preferences.timezone, user?.id],
   );
+  const [videoEnabled, setVideoEnabled] = useState(false);
   const [atmosphere, setAtmosphere] = useState<AtmosphereMode>("cycle");
   const backgroundSession = parked && !!active;
   const mix = useRef<RoomMix | null>(null),
@@ -125,10 +127,17 @@ export function RoomStage({
     let attached = true;
     mix.current
       ?.select(
-        audible === "lofi" || isYouTubeSound(audible) ? "silence" : audible,
+        audible === "lofi" || audible === "custom" || isYouTubeSound(audible)
+          ? "silence"
+          : audible,
       )
       .then(() => {
-        if (attached && audible !== "lofi" && !isYouTubeSound(audible))
+        if (
+          attached &&
+          audible !== "lofi" &&
+          audible !== "custom" &&
+          !isYouTubeSound(audible)
+        )
           setOutput(
             mix.current?.ctx.state === "running"
               ? mix.current?.current?.mode || "silence"
@@ -146,14 +155,20 @@ export function RoomStage({
   }, [audible]);
   async function select(value: Sound) {
     try {
-      if (value !== "silence" && value !== "lofi" && !isYouTubeSound(value)) {
+      if (
+        value !== "silence" &&
+        value !== "lofi" &&
+        value !== "custom" &&
+        !isYouTubeSound(value)
+      ) {
         mix.current ??= new RoomMix();
         await mix.current.unlock();
         mix.current.volume(vol);
       }
+      setVideoEnabled(false);
       setSound(value);
       setOutput("silence");
-      if (value === "lofi" || isYouTubeSound(value)) {
+      if (value === "lofi" || value === "custom" || isYouTubeSound(value)) {
         setPanel(true);
       }
       setHold(false);
@@ -171,6 +186,12 @@ export function RoomStage({
   const onVideoPlayback = useCallback(
     (playing: boolean) => {
       if (isYouTubeSound(sound)) setOutput(playing ? sound : "silence");
+    },
+    [sound],
+  );
+  const onCustomPlayback = useCallback(
+    (playing: boolean) => {
+      if (sound === "custom") setOutput(playing ? "custom" : "silence");
     },
     [sound],
   );
@@ -195,64 +216,74 @@ export function RoomStage({
     return () => window.removeEventListener("keydown", key);
   }, [panel, home, complete, onLeave]);
   return (
-    <div
-      className={
-        (home ? "salon-home-scene " : "cinema ") +
-        (minimal ? "minimal " : "") +
-        (failed ? "print " : "")
-      }
-      data-mood={sound}
-      data-audio={output}
-      data-scene={mode}
-      data-performer={performer}
-    >
-      {!minimal && (
-        <>
-          <img
-            className={"cinema-plate " + (ready && !failed ? "conceal" : "")}
-            src="/atelier/editions/home.webp"
-            alt="Static plate of the grand piano salon"
+    <>
+      <div
+        className={
+          (home ? "salon-home-scene " : "cinema ") +
+          (minimal ? "minimal " : "") +
+          (failed ? "print " : "")
+        }
+        data-mood={sound}
+        data-audio={output}
+        data-scene={mode}
+        data-performer={performer}
+      >
+        {!minimal && (
+          <>
+            <img
+              className={"cinema-plate " + (ready && !failed ? "conceal" : "")}
+              src="/atelier/editions/home.webp"
+              alt="Static plate of the grand piano salon"
+            />
+            {!failed && (
+              <div className="cinema-canvas">
+                <Guard failed={onSlow}>
+                  <World
+                    day={day}
+                    parked={parked}
+                    mode={backgroundSession ? "focus" : mode}
+                    onSettled={onSettled}
+                    sound={sound}
+                    moving={moving}
+                    effects={effects}
+                    playing={playing}
+                    playhead={() => {
+                      const m = mix.current,
+                        v = m?.current;
+                      return m && v?.mode === "piano"
+                        ? v.offset + m.ctx.currentTime - v.started
+                        : 0;
+                    }}
+                    onReady={onReady}
+                    onSlow={onSlow}
+                    onPerformer={setPerformer}
+                  />
+                </Guard>
+              </div>
+            )}
+          </>
+        )}
+        <div className="cinema-veil" />
+      </div>
+      {isYouTubeSound(sound) &&
+        videoEnabled &&
+        (!home || backgroundSession) &&
+        !complete && (
+          <YouTubeMusic
+            key={sound}
+            sound={sound}
+            playing={audible === sound}
+            canPlay={!paused && !complete}
+            volume={vol}
+            onClose={() => {
+              setVideoEnabled(false);
+              setOutput("silence");
+              setHold(true);
+            }}
+            onPlayback={onVideoPlayback}
+            onHold={setHold}
           />
-          {!failed && (
-            <div className="cinema-canvas">
-              <Guard failed={onSlow}>
-                <World
-                  day={day}
-                  parked={parked}
-                  mode={backgroundSession ? "focus" : mode}
-                  onSettled={onSettled}
-                  sound={sound}
-                  moving={moving}
-                  effects={effects}
-                  playing={playing}
-                  playhead={() => {
-                    const m = mix.current,
-                      v = m?.current;
-                    return m && v?.mode === "piano"
-                      ? v.offset + m.ctx.currentTime - v.started
-                      : 0;
-                  }}
-                  onReady={onReady}
-                  onSlow={onSlow}
-                  onPerformer={setPerformer}
-                />
-              </Guard>
-            </div>
-          )}
-        </>
-      )}
-      <div className="cinema-veil" />
-      {isYouTubeSound(sound) && (!home || backgroundSession) && !complete && (
-        <YouTubeMusic
-          key={sound}
-          sound={sound}
-          playing={audible === sound}
-          canPlay={!paused && !complete}
-          volume={vol}
-          onPlayback={onVideoPlayback}
-          onHold={setHold}
-        />
-      )}
+        )}
       {!home && (
         <div className="cinema-id">
           S / 01 &nbsp; SHRI’S LITTLE CORNER{" "}
@@ -273,7 +304,7 @@ export function RoomStage({
           {mode === "focus" ? "Leave · timer stays on" : "Leave room"}
         </button>
         <div
-          className={`cinema-dock cinema-chrome ${isYouTubeSound(sound) ? "video-dock" : ""}`}
+          className={`cinema-dock cinema-chrome ${isYouTubeSound(sound) && videoEnabled ? "video-dock" : ""}`}
         >
           <div
             className="sound-panel"
@@ -306,12 +337,14 @@ export function RoomStage({
                       ? youtubeTracks[v].label
                       : v === "lofi"
                         ? "Lo-fi"
-                        : v[0].toUpperCase() + v.slice(1)
+                        : v === "custom"
+                          ? "Custom audio"
+                          : v[0].toUpperCase() + v.slice(1)
                   }
                   aria-pressed={v === sound}
                   onClick={() => void select(v)}
                 >
-                  {!isYouTubeSound(v) && (
+                  {!isYouTubeSound(v) && v !== "custom" && (
                     <img src={`/atelier/editions/${v}.webp`} alt="" />
                   )}
                   <span>{title}</span>
@@ -319,9 +352,51 @@ export function RoomStage({
                     ? youtubeTracks[v].label
                     : v === "lofi"
                       ? "Lo-fi"
-                      : v[0].toUpperCase() + v.slice(1)}
+                      : v === "custom"
+                        ? "Custom audio"
+                        : v[0].toUpperCase() + v.slice(1)}
                 </button>
               ))}
+            </div>
+            {isYouTubeSound(sound) && !videoEnabled && (
+              <div className="youtube-source-choice">
+                <p>
+                  This source is on YouTube. Audio-only playback needs a direct
+                  audio link or file.
+                </p>
+                <button onClick={() => void select("custom")}>
+                  Use audio link or file
+                </button>
+                <button
+                  onClick={() => {
+                    setVideoEnabled(true);
+                    setHold(false);
+                  }}
+                >
+                  Play with video
+                </button>
+                <a
+                  href={`https://www.youtube.com/watch?v=${youtubeTracks[sound].id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open on YouTube ↗
+                </a>
+              </div>
+            )}
+            <div hidden={sound !== "custom"}>
+              <CustomAudio
+                playing={audible === "custom"}
+                canPlay={
+                  sound === "custom" &&
+                  (!home || backgroundSession) &&
+                  !paused &&
+                  !complete
+                }
+                volume={vol}
+                onPlayback={onCustomPlayback}
+                onHold={setHold}
+              />
             </div>
             <SoundCloudLofi
               selected={sound === "lofi"}
@@ -380,11 +455,13 @@ export function RoomStage({
                 ? youtubeTracks[sound].label
                 : sound === "lofi"
                   ? "Lo-fi"
-                  : sound}
+                  : sound === "custom"
+                    ? "Custom audio"
+                    : sound}
             </button>
             {sound !== "silence" && (
               <button
-                disabled={paused}
+                disabled={paused || (isYouTubeSound(sound) && !videoEnabled)}
                 onClick={() => setHold(!hold)}
                 aria-label={hold ? "Resume sound" : "Pause sound"}
               >
@@ -404,6 +481,6 @@ export function RoomStage({
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
